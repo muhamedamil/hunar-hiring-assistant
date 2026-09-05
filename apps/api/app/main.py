@@ -1,3 +1,5 @@
+"""FastAPI application factory and shared operational endpoints."""
+
 from __future__ import annotations
 
 from fastapi import FastAPI
@@ -8,15 +10,18 @@ from app.core.database import check_database_connection
 from app.core.errors import DatabaseUnavailableError, register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
+from app.jobs.router import router as jobs_router
 
 
 def create_app() -> FastAPI:
+    """Create the API application and register shared middleware, errors, and routers."""
+
     settings = get_settings()
     configure_logging(settings.log_level)
 
     app = FastAPI(
         title="Hunar Hiring Assistant API",
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
@@ -31,6 +36,7 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+    app.include_router(jobs_router)
 
     @app.get("/api/v1/health/live", tags=["health"])
     def live() -> dict[str, str]:

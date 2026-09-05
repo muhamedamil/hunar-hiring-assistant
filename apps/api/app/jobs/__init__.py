@@ -1,1 +1,1 @@
-# Module 1 placeholder. No job business logic belongs to Module 0.
+"""Job & Screening Definition domain package shared by both assessment workflows."""
