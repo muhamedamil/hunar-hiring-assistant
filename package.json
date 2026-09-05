@@ -1,0 +1,14 @@
+{
+  "name": "hunar-hiring-assistant",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "web:dev": "npm --workspace @hunar/web run dev",
+    "web:build": "npm --workspace @hunar/web run build",
+    "web:typecheck": "npm --workspace @hunar/web run typecheck",
+    "web:test": "npm --workspace @hunar/web run test",
+    "web:lint": "npm --workspace @hunar/web run lint"
+  }
+}
