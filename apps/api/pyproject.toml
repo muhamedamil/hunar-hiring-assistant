@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hunar-hiring-assistant-api"
-version = "0.1.0"
-description = "Module 0 foundation for the Hunar AI hiring assistant assessment"
+version = "0.2.0"
+description = "Hunar AI hiring assistant assessment backend through Module 1"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1.0",
