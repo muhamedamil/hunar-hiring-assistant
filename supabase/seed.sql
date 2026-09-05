@@ -1,0 +1,1 @@
+-- Module 0 contains infrastructure only and requires no seed business data.
