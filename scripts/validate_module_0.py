@@ -19,10 +19,18 @@ REQUIRED_FILES = [
     "apps/api/app/worker/runner.py",
     "apps/web/app/page.tsx",
     "apps/web/lib/api/client.ts",
-    "supabase/migrations/202609050001_module_0_foundation.sql",
+    "supabase/migrations/20260905115100_create_work_item_queue.sql",
 ]
 
 SOURCE_SUFFIXES = {".py", ".ts", ".tsx", ".js", ".sql"}
+IGNORED_SOURCE_DIRECTORIES = {
+    ".git",
+    ".next",
+    ".venv",
+    "env",
+    "node_modules",
+    "venv",
+}
 FORBIDDEN_SOURCE_PATTERNS = {
     "Base.metadata.create_all": "Schema creation must remain migration-only.",
     "NEXT_PUBLIC_DATABASE_URL": "Database credentials must never enter the browser.",
@@ -55,7 +63,7 @@ def main() -> int:
         if path.is_file()
         and path.suffix in SOURCE_SUFFIXES
         and path.resolve() != Path(__file__).resolve()
-        and not any(part in {"node_modules", ".next", ".git"} for part in path.parts)
+        and not any(part in IGNORED_SOURCE_DIRECTORIES for part in path.parts)
     ]
     source = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in source_files)
 
@@ -63,7 +71,7 @@ def main() -> int:
         if pattern in source:
             fail(f"forbidden source pattern {pattern!r}: {reason}", failures)
 
-    migration_path = ROOT / "supabase/migrations/202609050001_module_0_foundation.sql"
+    migration_path = ROOT / "supabase/migrations/20260905115100_create_work_item_queue.sql"
     if migration_path.exists():
         migration = migration_path.read_text(encoding="utf-8")
         tables = re.findall(

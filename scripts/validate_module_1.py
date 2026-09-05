@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = [
-    "MODULE_1_IMPLEMENTATION_PLAN.md",
+    "doc/MODULE_1_IMPLEMENTATION_PLAN.md",
     "apps/api/app/jobs/analysis.py",
     "apps/api/app/jobs/dependencies.py",
     "apps/api/app/jobs/errors.py",

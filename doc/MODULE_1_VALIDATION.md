@@ -10,7 +10,7 @@ Module 1 implements the shared Job & Screening Definition authority for both ass
 - provider-neutral alternate titles only in `requirements.alternate_titles`
 - AI analysis is synchronous, optional, and non-mutating
 - DRAFT is mutable working state
-- READY requires an immutableHunar-Hiring-Assistant-Module-1-AGAINST-LATEST.patch approved snapshot
+- READY requires an immutable approved snapshot
 - approved snapshots cannot be updated or deleted through application repository methods
 - PostgreSQL trigger rejects snapshot UPDATE/DELETE
 - every mutation uses `expected_revision` plus a locked Job row

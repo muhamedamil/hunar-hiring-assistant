@@ -1,11 +1,12 @@
-# Hunar Hiring Assistant — Modules 0 + 1
+# Hunar Hiring Assistant — Modules 0 + 1 + 2
 
-This repository contains the implementation foundation and the shared **Job & Screening Definition** workflow for the Hunar.ai hiring-assistant assessment.
+This repository contains the application foundation, shared **Job & Screening Definition** authority, and global **Candidate Core** for the Hunar.ai hiring-assistant assessment.
 
 Current scope:
 
 - **Module 0 — Application Foundation:** complete foundation for FastAPI, Supabase Postgres, migrations, provider HTTP conventions, durable work items, logging, request IDs, and the Next.js frontend shell.
 - **Module 1 — Job & Screening Definition:** one recruiter-approved hiring definition shared by Task 1 (voice screening) and Task 2 (people search / reachout).
+- **Module 2 — Candidate Core:** one global Candidate identity shared by manual Task-1 candidates and future Task-2 provider-sourced people.
 
 ## Core Module 1 invariant
 
@@ -34,6 +35,17 @@ Task 1 voice screening   Task 2 people search
 
 The raw JD and AI output are **not** downstream business truth. Only an immutable approved definition for a currently READY Job may start new sourcing, matching, or screening work.
 
+## Core Module 2 invariant
+
+```text
+Task 1 manual candidate ─┐
+                         ├─> one canonical Candidate
+Task 2 sourced person ───┘            |
+                                      +─ provider identities
+```
+
+Candidate Core is global and Job-independent. Email/phone are optional strong identifiers, provider identity is stored separately, and name/title/company/location similarity never auto-merges people.
+
 ## Architecture
 
 ```text
@@ -45,11 +57,11 @@ Next.js / React / TypeScript / shadcn-style UI
           SQLAlchemy 2.x + psycopg
                     |
              Supabase Postgres
-              /             \
-         work_items          jobs
-                              |
-                    job_definition_versions
-                    (immutable snapshots)
+          /          |             \
+    work_items      jobs         candidates
+                    |               |
+          job_definition_versions  candidate_external_identities
+          (immutable snapshots)    (provider identity links)
 ```
 
 ## State ownership
@@ -60,6 +72,9 @@ Next.js / React / TypeScript / shadcn-style UI
 - `revision` is the optimistic-concurrency token for the mutable Job aggregate.
 - `approved_version` points to the latest immutable approved snapshot.
 - Reopening a READY Job blocks new downstream work but never mutates or invalidates previously approved versions.
+- `candidates` owns the mutable global Candidate profile and `revision` concurrency token.
+- `candidate_external_identities` separates provider/person identity from canonical Candidate truth.
+- Candidate contact values are optional; contact readiness is derived rather than persisted as another state machine.
 
 ## AI analysis
 
@@ -89,6 +104,7 @@ apps/
     app/
       core/
       jobs/
+      candidates/
       integrations/
         gemini/
       work_items/
@@ -97,18 +113,25 @@ apps/
   web/
     app/
       jobs/
+      candidates/
     components/
       jobs/
+      candidates/
       ui/
     lib/
       jobs/
+      candidates/
 supabase/
   migrations/
 scripts/
   validate_module_0.py
   validate_module_1.py
-MODULE_1_IMPLEMENTATION_PLAN.md
-MODULE_1_VALIDATION.md
+  validate_module_2.py
+doc/
+  MODULE_1_IMPLEMENTATION_PLAN.md
+  MODULE_1_VALIDATION.md
+  MODULE_2_IMPLEMENTATION_PLAN.md
+  MODULE_2_VALIDATION.md
 ```
 
 ## 1. Prerequisites
@@ -129,7 +152,7 @@ supabase db reset
 supabase status
 ```
 
-`supabase db reset` must apply both migration files from an empty local database.
+`supabase db reset` must apply all Module 0–2 migration files from an empty local database.
 
 Use the local Postgres URL from `supabase status`, for example:
 
@@ -211,6 +234,7 @@ Open:
 
 ```text
 http://localhost:3000/jobs
+http://localhost:3000/candidates
 ```
 
 ## 5. Module 1 validation
@@ -309,3 +333,41 @@ New tables have RLS enabled and browser roles revoked; the frontend accesses the
 - authentication / RBAC
 
 These belong to later modules and must consume the immutable approved Job definition rather than reparsing the raw JD.
+
+
+## 7. Module 2 validation
+
+Structural validation:
+
+```bash
+python scripts/validate_module_2.py
+```
+
+Backend/local Supabase:
+
+```powershell
+cd apps\api
+.\.venv\Scripts\Activate.ps1
+$env:TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+python -m pytest -q
+```
+
+With backend dependencies and migrated local Supabase available, all 83 current backend tests should execute rather than environment-skip.
+
+Manual Candidate Core smoke:
+
+1. Open `/candidates/new` and create a name-only Candidate.
+2. Create another Candidate with email and international phone; confirm phone is stored as E.164.
+3. Attempt the same email with different case; confirm `CANDIDATE_ALREADY_EXISTS` and the UI links to the existing Candidate.
+4. Open the same Candidate in two tabs, save one, then save the stale tab; confirm revision conflict instead of overwrite.
+5. Confirm `/candidates` shows only contact availability badges, while `/candidates/{id}` shows actual contact details.
+6. Verify Candidate creation/editing has no Job, match, shortlist, sourcing-provider, or outreach state.
+
+Full frontend gate remains:
+
+```bash
+npm run web:lint
+npm run web:typecheck
+npm run web:test
+npm run web:build
+```
