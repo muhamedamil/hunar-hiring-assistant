@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.candidates.router import router as candidates_router
 from app.core.config import get_settings
 from app.core.database import check_database_connection
 from app.core.errors import DatabaseUnavailableError, register_exception_handlers
@@ -21,7 +22,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Hunar Hiring Assistant API",
-        version="0.2.0",
+        version="0.3.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(jobs_router)
+    app.include_router(candidates_router)
 
     @app.get("/api/v1/health/live", tags=["health"])
     def live() -> dict[str, str]:

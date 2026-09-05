@@ -1,1 +1,1 @@
-# Module 2 placeholder. No candidate business logic belongs to Module 0.
+"""Candidate Core domain for global recruiter and provider-neutral person identity."""
