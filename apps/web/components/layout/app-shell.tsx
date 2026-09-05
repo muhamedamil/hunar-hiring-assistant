@@ -13,6 +13,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href="/jobs" className="transition-colors hover:text-slate-950">
               Jobs
             </Link>
+            <Link href="/candidates" className="transition-colors hover:text-slate-950">
+              Candidates
+            </Link>
           </nav>
         </div>
       </header>
