@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { AppShell } from "@/components/layout/app-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function HomePage() {
@@ -6,23 +9,26 @@ export default function HomePage() {
     <AppShell>
       <div className="mx-auto grid w-full max-w-4xl gap-6 py-10">
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-500">Module 0</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Application foundation</h1>
+          <p className="text-sm font-medium text-slate-500">Module 1</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Job & screening definition</h1>
           <p className="max-w-2xl text-slate-600">
-            The shared frontend, API, Supabase Postgres, worker, error, retry-classification,
-            and logging primitives are ready for the hiring workflow modules.
+            Build one recruiter-approved hiring definition that becomes the shared source of truth for
+            people sourcing and Hunar voice screening.
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Foundation boundary</CardTitle>
+            <CardTitle>Hiring-definition workflow</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-            <p>Supabase Postgres owns durable application state.</p>
-            <p>SQL migrations own schema changes.</p>
-            <p>Workers never blindly repeat ambiguous side effects.</p>
-            <p>Business logic begins in Module 1, not here.</p>
+          <CardContent className="space-y-4 text-sm text-slate-600">
+            <p>
+              AI analysis is optional and produces editable suggestions only. A recruiter-approved READY
+              version is stored as an immutable definition snapshot.
+            </p>
+            <Button asChild>
+              <Link href="/jobs">Open jobs</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
