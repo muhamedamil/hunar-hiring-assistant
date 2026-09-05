@@ -15,6 +15,8 @@ _SENSITIVE_FRAGMENTS = (
     "api_key",
     "apikey",
     "database_url",
+    "email",
+    "phone",
 )
 
 

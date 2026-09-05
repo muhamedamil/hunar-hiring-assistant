@@ -23,6 +23,7 @@ def get_engine() -> Engine:
         pool_size=5,
         max_overflow=5,
         pool_recycle=1800,
+        hide_parameters=True,
     )
 
 
