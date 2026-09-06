@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+PROFESSIONAL_EVIDENCE_VERSION = "professional_evidence_v1"
 
 
 class SourcingRunStatus(StrEnum):
@@ -37,6 +39,34 @@ class PhoneAvailability(StrEnum):
     MAYBE = "maybe"
     UNAVAILABLE = "unavailable"
     UNKNOWN = "unknown"
+
+
+class EnrichmentPriority(StrEnum):
+    """Credit-spend recommendation derived only from persisted search evidence."""
+
+    RECOMMENDED = "recommended"
+    POSSIBLE = "possible"
+    LOW_PRIORITY = "low_priority"
+
+
+class EnrichmentPriorityReason(BaseModel):
+    """Machine-readable explanation for one pre-enrichment recommendation signal."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=1, max_length=80)
+    outcome: Literal["positive", "negative", "unknown"]
+    detail: str = Field(min_length=1, max_length=240)
+
+
+class EnrichmentPriorityAssessment(BaseModel):
+    """Ordinal enrichment recommendation that is explicitly not a hiring-fit score."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    priority: EnrichmentPriority
+    reasons: list[EnrichmentPriorityReason]
+    algorithm_version: str = Field(min_length=1, max_length=80)
 
 
 class UnmappedRequirement(BaseModel):
@@ -111,6 +141,32 @@ class ProviderEnrichedPerson(BaseModel):
     linkedin_url: AnyHttpUrl | None = Field(default=None, max_length=1000)
 
 
+class ProfessionalExperienceEvidence(BaseModel):
+    """Provider-neutral matching evidence for one documented employment-history entry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, max_length=200)
+    organization_name: str | None = Field(default=None, max_length=200)
+    started_at: date | None = None
+    is_current: bool | None = None
+
+
+class CandidateProfessionalEvidence(BaseModel):
+    """Normalized non-contact professional evidence from one enrichment response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_title: str | None = Field(default=None, max_length=200)
+    current_organization_name: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    profile_url: AnyHttpUrl | None = Field(default=None, max_length=1000)
+    employment_history: list[ProfessionalExperienceEvidence] = Field(
+        default_factory=list,
+        max_length=100,
+    )
+
+
 class ProviderEnrichmentResponse(BaseModel):
     """Synchronous enrichment response plus async-phone recovery identity."""
 
@@ -118,6 +174,7 @@ class ProviderEnrichmentResponse(BaseModel):
 
     person: ProviderEnrichedPerson | None
     request_id: int | None = None
+    professional_evidence: CandidateProfessionalEvidence | None = None
 
 
 class ProviderPhoneNumber(BaseModel):
@@ -194,6 +251,9 @@ class SourcingResultResponse(BaseModel):
     organization_name: str | None
     email_available: bool
     phone_availability: PhoneAvailability
+    enrichment_priority: EnrichmentPriority
+    enrichment_priority_reasons: list[EnrichmentPriorityReason]
+    enrichment_priority_algorithm_version: str
     candidate_id: UUID | None
     created_at: datetime
 
@@ -270,3 +330,17 @@ class SourcingRunDetailResponse(BaseModel):
     updated_at: datetime
     results: list[SourcingResultResponse]
     enrichments: list[SourcingEnrichmentResponse]
+
+
+class MatchingProfessionalEvidenceSource(BaseModel):
+    """Provenance-bound read seam for future matching consumers inside the backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: UUID
+    sourcing_result_id: UUID
+    sourcing_run_id: UUID
+    job_id: UUID
+    definition_version: int = Field(ge=1)
+    professional_evidence: CandidateProfessionalEvidence
+    evidence_version: str = Field(min_length=1, max_length=80)

@@ -149,6 +149,14 @@ class SourcingEnrichment(Base):
             name="ck_sourcing_enrichments_status",
         ),
         CheckConstraint("attempt_count >= 0", name="ck_sourcing_enrichments_attempt_count"),
+        CheckConstraint(
+            "professional_evidence is null or jsonb_typeof(professional_evidence) = 'object'",
+            name="ck_sourcing_enrichments_professional_evidence_object",
+        ),
+        CheckConstraint(
+            "(professional_evidence is null) = (evidence_version is null)",
+            name="ck_sourcing_enrichments_professional_evidence_version",
+        ),
         Index(
             "uq_sourcing_enrichments_provider_request",
             "provider_request_id",
@@ -177,6 +185,8 @@ class SourcingEnrichment(Base):
     credits_consumed: Mapped[int | None] = mapped_column(Integer)
     failure_code: Mapped[str | None] = mapped_column(String(100))
     retry_after_seconds: Mapped[int | None] = mapped_column(Integer)
+    professional_evidence: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    evidence_version: Mapped[str | None] = mapped_column(String(80))
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
