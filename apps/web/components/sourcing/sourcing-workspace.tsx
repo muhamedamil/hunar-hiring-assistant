@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError } from "@/lib/api/errors";
 import type { Job } from "@/lib/jobs/types";
+import { addSourcedJobCandidate } from "@/lib/matching/api";
+import { matchingKeys } from "@/lib/matching/queries";
 import {
   enrichSourcingResult,
   getSourcingRun,
@@ -170,6 +172,7 @@ function enrichmentFor(run: SourcingRun, resultId: string): SourcingEnrichment |
 }
 
 export function SourcingRunWorkspace({ runId }: { runId: string }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const runQuery = useQuery({
@@ -186,6 +189,14 @@ export function SourcingRunWorkspace({ runId }: { runId: string }) {
   const enrichMutation = useMutation({
     mutationFn: (resultId: string) => enrichSourcingResult(resultId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sourcingKeys.run(runId) }),
+    onError: (value) => setError(errorMessage(value)),
+  });
+  const reviewMatchMutation = useMutation({
+    mutationFn: (resultId: string) => addSourcedJobCandidate(resultId),
+    onSuccess: (relation) => {
+      void queryClient.invalidateQueries({ queryKey: matchingKeys.job(relation.job_id) });
+      router.push(`/job-candidates/${relation.id}`);
+    },
     onError: (value) => setError(errorMessage(value)),
   });
   const retryMutation = useMutation({
@@ -304,6 +315,18 @@ export function SourcingRunWorkspace({ runId }: { runId: string }) {
                     {enrichment ? <SourcingStatusBadge status={enrichment.status} /> : null}
                     {enrichment?.candidate_id ? (
                       <Button asChild variant="outline" size="sm"><Link href={`/candidates/${enrichment.candidate_id}`}>Open candidate</Link></Button>
+                    ) : null}
+                    {enrichment?.candidate_id ? (
+                      <Button
+                        size="sm"
+                        disabled={reviewMatchMutation.isPending}
+                        onClick={() => {
+                          setError(null);
+                          reviewMatchMutation.mutate(result.id);
+                        }}
+                      >
+                        Review match
+                      </Button>
                     ) : null}
                     {!enrichment ? (
                       <Button

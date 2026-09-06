@@ -192,6 +192,10 @@ describe("JobEditor", () => {
       "href",
       `/jobs/${current.id}/sourcing`,
     );
+    expect(screen.getByRole("link", { name: "Review candidates" })).toHaveAttribute(
+      "href",
+      `/jobs/${current.id}/candidates`,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Reopen to edit" }));
     await waitFor(() => expect(screen.getByLabelText("Job title")).not.toBeDisabled());

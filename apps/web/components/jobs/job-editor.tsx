@@ -345,6 +345,9 @@ export function JobEditor({ initialJob }: { initialJob?: Job }) {
             <Button asChild type="button">
               <Link href={`/jobs/${job.id}/sourcing`}>Find people</Link>
             </Button>
+            <Button asChild type="button" variant="outline">
+              <Link href={`/jobs/${job.id}/candidates`}>Review candidates</Link>
+            </Button>
             <Button type="button" variant="outline" disabled={pending} onClick={handleReopen}>
               Reopen to edit
             </Button>

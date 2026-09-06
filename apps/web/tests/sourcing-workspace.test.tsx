@@ -10,12 +10,17 @@ import {
 import { ApiError } from "@/lib/api/errors";
 import * as sourcingApi from "@/lib/sourcing/api";
 import type { Job } from "@/lib/jobs/types";
+import * as matchingApi from "@/lib/matching/api";
 import type { SourcingRun } from "@/lib/sourcing/types";
 
 const push = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
+}));
+
+vi.mock("@/lib/matching/api", () => ({
+  addSourcedJobCandidate: vi.fn(),
 }));
 
 vi.mock("@/lib/sourcing/api", async () => {
@@ -293,6 +298,42 @@ describe("Module 3 sourcing UI", () => {
     expect(
       screen.queryByRole("button", { name: "Enrich contact" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("Review match attaches/evaluates the resolved Candidate and navigates to review", async () => {
+    const current = run();
+    const candidateId = "88888888-8888-4888-8888-888888888888";
+    const relationId = "99999999-9999-4999-8999-999999999999";
+    current.enrichments = [
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        sourcing_result_id: current.results[0].id,
+        provider: "apollo",
+        status: "completed",
+        candidate_id: candidateId,
+        provider_request_id: null,
+        credits_consumed: 1,
+        failure_code: null,
+        retry_after_seconds: null,
+        requested_at: "2026-09-06T00:00:02Z",
+        completed_at: "2026-09-06T00:00:03Z",
+        created_at: "2026-09-06T00:00:02Z",
+        updated_at: "2026-09-06T00:00:03Z",
+      },
+    ];
+    vi.mocked(sourcingApi.getSourcingRun).mockResolvedValue(current);
+    vi.mocked(matchingApi.addSourcedJobCandidate).mockResolvedValue({
+      id: relationId,
+      job_id: current.job_id,
+    } as Awaited<ReturnType<typeof matchingApi.addSourcedJobCandidate>>);
+    renderWithClient(<SourcingRunWorkspace runId={current.id} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Review match" }));
+
+    await waitFor(() => {
+      expect(matchingApi.addSourcedJobCandidate).toHaveBeenCalledWith(current.results[0].id);
+      expect(push).toHaveBeenCalledWith(`/job-candidates/${relationId}`);
+    });
   });
 
 });
