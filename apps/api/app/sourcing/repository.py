@@ -152,3 +152,21 @@ class SourcingRepository:
             .order_by(SourcingEnrichment.created_at.asc())
         )
         return list(session.execute(statement).scalars())
+
+    def get_evidence_source_for_result(
+        self,
+        session: Session,
+        result_id: UUID,
+    ) -> tuple[SourcingEnrichment, SourcingResult, SourcingRun] | None:
+        """Return the one provenance chain that may carry matching evidence."""
+
+        statement = (
+            select(SourcingEnrichment, SourcingResult, SourcingRun)
+            .join(
+                SourcingResult,
+                SourcingResult.id == SourcingEnrichment.sourcing_result_id,
+            )
+            .join(SourcingRun, SourcingRun.id == SourcingResult.sourcing_run_id)
+            .where(SourcingResult.id == result_id)
+        )
+        return session.execute(statement).tuples().one_or_none()

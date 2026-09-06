@@ -17,6 +17,7 @@ from app.sourcing.errors import (
 )
 from app.sourcing.models import SourcingEnrichment, SourcingResult, SourcingRun
 from app.sourcing.schemas import (
+    EnrichmentPriority,
     ProviderSearchHit,
     ProviderSearchPage,
     ProviderSearchQuery,
@@ -139,6 +140,21 @@ class FakeRepository:
             item for item in self.enrichments.values() if item.sourcing_result_id in result_ids
         ]
 
+    def get_evidence_source_for_result(
+        self,
+        session: Any,
+        result_id: UUID,
+    ) -> tuple[SourcingEnrichment, SourcingResult, SourcingRun] | None:
+        del session
+        result = self.results.get(result_id)
+        if result is None:
+            return None
+        enrichment = self.get_enrichment_by_result(None, result_id)
+        run = self.runs.get(result.sourcing_run_id)
+        if enrichment is None or run is None:
+            return None
+        return enrichment, result, run
+
 
 class FakeJobService:
     """Return one immutable approved definition and record downstream binding calls."""
@@ -243,6 +259,86 @@ def test_search_binds_to_approved_version_and_keeps_hits_out_of_candidate_core(
     assert run.criteria.unmapped_requirements[0].field == "required_skills"
     assert all(result.candidate_id is None for result in run.results)
     assert provider.calls == 1
+
+
+def test_priority_uses_historical_run_criteria_after_job_reapproval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approved_v3 = definition()
+    FakeJobService.definition = approved_v3
+    monkeypatch.setattr("app.sourcing.service.JobService", FakeJobService)
+    repository = FakeRepository()
+    provider = FakeSearchProvider(
+        [
+            ProviderSearchPage(
+                hits=[
+                    ProviderSearchHit(
+                        external_person_id="person-1",
+                        title="Senior Backend Engineer",
+                        phone_availability="available",
+                    )
+                ]
+            )
+        ]
+    )
+    service = SourcingService(
+        FakeSession(),  # type: ignore[arg-type]
+        search_provider=provider,
+        repository=repository,
+    )
+    original = service.start_search(approved_v3.job_id, result_limit=10)
+    FakeJobService.definition = approved_v3.model_copy(
+        update={"version": 4, "title": "Account Executive"}
+    )
+
+    historical = service.get_run(original.id)
+
+    assert historical.definition_version == 3
+    assert historical.results[0].enrichment_priority is EnrichmentPriority.RECOMMENDED
+    assert provider.calls == 1
+
+
+def test_matching_evidence_seam_returns_exact_job_and_source_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approved = definition()
+    FakeJobService.definition = approved
+    monkeypatch.setattr("app.sourcing.service.JobService", FakeJobService)
+    repository = FakeRepository()
+    service = SourcingService(
+        FakeSession(),  # type: ignore[arg-type]
+        search_provider=FakeSearchProvider([page(1)]),
+        repository=repository,
+    )
+    run = service.start_search(approved.job_id, result_limit=10)
+    result = repository.results[run.results[0].id]
+    candidate_id = uuid4()
+    result.candidate_id = candidate_id
+    enrichment = SourcingEnrichment(
+        sourcing_result_id=result.id,
+        provider="apollo",
+        status="awaiting_phone",
+        candidate_id=candidate_id,
+        professional_evidence={
+            "current_title": "Backend Engineer",
+            "current_organization_name": "Acme",
+            "location": None,
+            "profile_url": None,
+            "employment_history": [],
+        },
+        evidence_version="professional_evidence_v1",
+        updated_at=datetime.now(UTC),
+    )
+    repository.create_enrichment(None, enrichment)
+
+    source = service.get_matching_evidence_for_sourcing_result(result.id)
+
+    assert source is not None
+    assert source.candidate_id == candidate_id
+    assert source.sourcing_result_id == result.id
+    assert source.sourcing_run_id == run.id
+    assert source.job_id == approved.job_id
+    assert source.definition_version == 3
 
 
 def test_service_rejects_over_limit_page_even_if_provider_adapter_is_bypassed(

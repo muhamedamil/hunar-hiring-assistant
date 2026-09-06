@@ -12,6 +12,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
+from app.candidates.schemas import CandidateCreateRequest
+from app.candidates.service import CandidateService
 from app.core.config import Settings
 from app.jobs.errors import JobNotReadyError
 from app.jobs.schemas import (
@@ -24,8 +26,13 @@ from app.jobs.schemas import (
 from app.jobs.service import JobService
 from app.sourcing.models import SourcingRun
 from app.sourcing.repository import SourcingRepository
-from app.sourcing.schemas import ProviderSearchPage
+from app.sourcing.schemas import (
+    CandidateProfessionalEvidence,
+    ProviderPhoneResult,
+    ProviderSearchPage,
+)
 from app.sourcing.service import SourcingService
+from app.sourcing.webhooks import SourcingWebhookService
 from app.sourcing.workers import SourcingWorkHandlers
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -208,6 +215,106 @@ def test_signed_bigint_request_id_and_single_enrichment_per_result_are_enforced(
             {"result_id": result_id},
         )
 
+
+def test_professional_evidence_constraints_and_async_finalization_preserve_snapshot(
+    session_factory,  # type: ignore[no-untyped-def]
+) -> None:
+    job_id, _ = _create_ready_job(session_factory)
+    with session_factory() as session:
+        candidate = CandidateService(session).create_manual_candidate(
+            CandidateCreateRequest(full_name="Sarah Ahmed")
+        )
+    evidence = {
+        "current_title": "Backend Engineer",
+        "current_organization_name": "Acme",
+        "location": "Bengaluru, India",
+        "profile_url": None,
+        "employment_history": [],
+    }
+    with session_factory.begin() as session:
+        run_id = session.execute(
+            text(
+                "insert into public.sourcing_runs"
+                "(job_id,definition_version,provider,status,criteria,provider_query,"
+                "mapping_version,result_limit,result_count,completed_at) "
+                "values (:job_id,1,'apollo','completed','{}','{}','test',10,1,now()) "
+                "returning id"
+            ),
+            {"job_id": job_id},
+        ).scalar_one()
+        result_id = session.execute(
+            text(
+                "insert into public.sourcing_results"
+                "(sourcing_run_id,provider_person_id,result_position,candidate_id) "
+                "values (:run_id,'person-evidence',1,:candidate_id) returning id"
+            ),
+            {"run_id": run_id, "candidate_id": candidate.id},
+        ).scalar_one()
+        enrichment_id = session.execute(
+            text(
+                "insert into public.sourcing_enrichments"
+                "(sourcing_result_id,provider,status) "
+                "values (:result_id,'apollo','pending') returning id"
+            ),
+            {"result_id": result_id},
+        ).scalar_one()
+
+    handlers = SourcingWorkHandlers(
+        session_factory=session_factory,
+        provider=None,
+        settings=Settings(
+            database_url=_url(),
+            apollo_webhook_base_url="https://example.test",
+            apollo_webhook_signing_secret="test-secret",
+        ),
+    )
+    handlers._mark_awaiting_phone(  # noqa: SLF001
+        enrichment_id,
+        candidate_id=candidate.id,
+        request_id=-7,
+        professional_evidence=CandidateProfessionalEvidence.model_validate(evidence),
+    )
+
+    finalizer = SourcingWebhookService(session_factory)
+    phone_result = ProviderPhoneResult(
+        request_id=-7,
+        external_person_id="person-evidence",
+        phones=[],
+    )
+    first = finalizer.finalize_phone_result(enrichment_id, phone_result)
+    second = finalizer.finalize_phone_result(enrichment_id, phone_result)
+
+    assert first.status.value == "completed"
+    assert second.status.value == "completed"
+    with session_factory() as session:
+        row = session.execute(
+            text(
+                "select professional_evidence,evidence_version "
+                "from public.sourcing_enrichments where id=:id"
+            ),
+            {"id": enrichment_id},
+        ).one()
+        assert row.professional_evidence == evidence
+        assert row.evidence_version == "professional_evidence_v1"
+
+    with pytest.raises(IntegrityError), session_factory.begin() as session:
+        session.execute(
+            text(
+                "update public.sourcing_enrichments set evidence_version=null "
+                "where id=:id"
+            ),
+            {"id": enrichment_id},
+        )
+
+    with pytest.raises(IntegrityError), session_factory.begin() as session:
+        session.execute(
+            text(
+                "update public.sourcing_enrichments set "
+                "professional_evidence=to_jsonb('invalid'::text), "
+                "evidence_version='professional_evidence_v1' where id=:id"
+            ),
+            {"id": enrichment_id},
+        )
 
 def test_reopen_first_blocks_new_sourcing_after_row_lock_release(
     session_factory,  # type: ignore[no-untyped-def]

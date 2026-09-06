@@ -30,10 +30,13 @@ from app.sourcing.errors import (
 )
 from app.sourcing.mapping import MAPPING_VERSION, build_search_mapping
 from app.sourcing.models import SourcingEnrichment, SourcingResult, SourcingRun
+from app.sourcing.prioritization import assess_enrichment_priority
 from app.sourcing.provider import PeopleSearchProvider
 from app.sourcing.repository import SourcingRepository
 from app.sourcing.schemas import (
+    CandidateProfessionalEvidence,
     EnrichmentStatus,
+    MatchingProfessionalEvidenceSource,
     PhoneAvailability,
     ProviderSearchPage,
     ProviderSearchQuery,
@@ -213,6 +216,34 @@ class SourcingService:
         if enrichment is None:
             raise SourcingEnrichmentNotFoundError()
         return self._to_enrichment_response(enrichment)
+
+    def get_matching_evidence_for_sourcing_result(
+        self,
+        result_id: UUID,
+    ) -> MatchingProfessionalEvidenceSource | None:
+        """Return normalized professional evidence with its exact sourcing provenance."""
+
+        source = self._repository.get_evidence_source_for_result(self._session, result_id)
+        if source is None:
+            return None
+        enrichment, result, run = source
+        if (
+            enrichment.candidate_id is None
+            or enrichment.professional_evidence is None
+            or enrichment.evidence_version is None
+        ):
+            return None
+        return MatchingProfessionalEvidenceSource(
+            candidate_id=enrichment.candidate_id,
+            sourcing_result_id=result.id,
+            sourcing_run_id=run.id,
+            job_id=run.job_id,
+            definition_version=run.definition_version,
+            professional_evidence=CandidateProfessionalEvidence.model_validate(
+                enrichment.professional_evidence
+            ),
+            evidence_version=enrichment.evidence_version,
+        )
 
     def _execute_search(
         self,
@@ -448,7 +479,17 @@ class SourcingService:
         )
 
     @staticmethod
-    def _to_result_response(result: SourcingResult) -> SourcingResultResponse:
+    def _to_result_response(
+        result: SourcingResult,
+        criteria: SourcingSearchCriteria,
+    ) -> SourcingResultResponse:
+        assessment = assess_enrichment_priority(
+            current_title=result.current_title,
+            target_titles=criteria.titles,
+            phone_availability=PhoneAvailability(result.phone_availability),
+            email_available=result.email_available,
+            locations_requested=bool(criteria.locations),
+        )
         return SourcingResultResponse(
             id=result.id,
             sourcing_run_id=result.sourcing_run_id,
@@ -460,6 +501,9 @@ class SourcingService:
             organization_name=result.organization_name,
             email_available=result.email_available,
             phone_availability=PhoneAvailability(result.phone_availability),
+            enrichment_priority=assessment.priority,
+            enrichment_priority_reasons=assessment.reasons,
+            enrichment_priority_algorithm_version=assessment.algorithm_version,
             candidate_id=result.candidate_id,
             created_at=result.created_at,
         )
@@ -490,13 +534,14 @@ class SourcingService:
         results: list[SourcingResult],
         enrichments: list[SourcingEnrichment],
     ) -> SourcingRunDetailResponse:
+        criteria = SourcingSearchCriteria.model_validate(run.criteria)
         return SourcingRunDetailResponse(
             id=run.id,
             job_id=run.job_id,
             definition_version=run.definition_version,
             provider=run.provider,
             status=SourcingRunStatus(run.status),
-            criteria=SourcingSearchCriteria.model_validate(run.criteria),
+            criteria=criteria,
             provider_query=ProviderSearchQuery.model_validate(run.provider_query),
             mapping_version=run.mapping_version,
             result_limit=run.result_limit,
@@ -509,6 +554,6 @@ class SourcingService:
             completed_at=run.completed_at,
             created_at=run.created_at,
             updated_at=run.updated_at,
-            results=[self._to_result_response(result) for result in results],
+            results=[self._to_result_response(result, criteria) for result in results],
             enrichments=[self._to_enrichment_response(item) for item in enrichments],
         )

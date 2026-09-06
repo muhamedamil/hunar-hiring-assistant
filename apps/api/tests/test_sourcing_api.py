@@ -72,6 +72,22 @@ class FakeSourcingService:
                     "organization_name": "Acme",
                     "email_available": True,
                     "phone_availability": "available",
+                    "enrichment_priority": "recommended",
+                    "enrichment_priority_reasons": [
+                        {
+                            "code": "primary_title_exact",
+                            "outcome": "positive",
+                            "detail": "Exact target title",
+                        },
+                        {
+                            "code": "phone_available",
+                            "outcome": "positive",
+                            "detail": "Phone likely available",
+                        },
+                    ],
+                    "enrichment_priority_algorithm_version": (
+                        "search_evidence_priority_v1"
+                    ),
                     "candidate_id": None,
                     "created_at": now,
                 }
@@ -159,6 +175,7 @@ def test_start_list_get_retry_and_enrich_routes(
         json={"result_limit": 10},
     )
     assert started.status_code == 201
+    assert started.json()["results"][0]["enrichment_priority"] == "recommended"
     assert started.json()["definition_version"] == 2
     assert started.json()["results"][0]["candidate_id"] is None
 
