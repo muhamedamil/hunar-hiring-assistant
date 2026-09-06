@@ -1,3 +1,5 @@
+"""Durable worker runner with lease recovery and optional domain reconciliation hooks."""
+
 from __future__ import annotations
 
 import logging
@@ -5,6 +7,7 @@ import os
 import socket
 import time
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import Settings, get_settings
@@ -23,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class WorkerRunner:
+    """Claim durable work, execute registered handlers, and persist certain outcomes."""
+
     def __init__(
         self,
         *,
@@ -31,18 +36,22 @@ class WorkerRunner:
         settings: Settings | None = None,
         backoff_policy: BackoffPolicy | None = None,
         worker_id: str | None = None,
+        after_stale_recovery: Callable[[], object] | None = None,
     ) -> None:
         self.registry = registry
         self.repository = repository or WorkItemRepository()
         self.settings = settings or get_settings()
         self.backoff_policy = backoff_policy or BackoffPolicy()
         self.worker_id = worker_id or self._build_worker_id()
+        self.after_stale_recovery = after_stale_recovery
 
     @staticmethod
     def _build_worker_id() -> str:
         return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
 
     def recover_stale_work(self) -> int:
+        """Move expired RUNNING work to UNKNOWN, then reconcile domain-specific projections."""
+
         with session_scope() as session:
             recovered = self.repository.recover_stale_running(
                 session,
@@ -53,13 +62,19 @@ class WorkerRunner:
                 "Moved stale running work to UNKNOWN",
                 extra={"context": {"count": recovered}},
             )
+        if self.after_stale_recovery is not None:
+            self.after_stale_recovery()
         return recovered
 
     def claim_one(self) -> WorkItem | None:
+        """Claim the next eligible work item using the queue's lock-safe ordering."""
+
         with session_scope() as session:
             return self.repository.claim_next(session, worker_id=self.worker_id)
 
     def process_one(self) -> bool:
+        """Process at most one work item and persist its classified execution outcome."""
+
         item = self.claim_one()
         if item is None:
             return False
@@ -109,6 +124,8 @@ class WorkerRunner:
         return True
 
     def run_forever(self) -> None:
+        """Run the polling loop until interrupted, periodically recovering expired leases."""
+
         logger.info("Worker started", extra={"context": {"worker_id": self.worker_id}})
         self.recover_stale_work()
         last_recovery_at = time.monotonic()

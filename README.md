@@ -1,12 +1,13 @@
-# Hunar Hiring Assistant — Modules 0 + 1 + 2
+# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3
 
-This repository contains the application foundation, shared **Job & Screening Definition** authority, and global **Candidate Core** for the Hunar.ai hiring-assistant assessment.
+This repository contains the application foundation, shared **Job & Screening Definition** authority, global **Candidate Core**, and Job-bound **People Search & Contact Enrichment** workflow for the Hunar.ai hiring-assistant assessment.
 
 Current scope:
 
 - **Module 0 — Application Foundation:** complete foundation for FastAPI, Supabase Postgres, migrations, provider HTTP conventions, durable work items, logging, request IDs, and the Next.js frontend shell.
 - **Module 1 — Job & Screening Definition:** one recruiter-approved hiring definition shared by Task 1 (voice screening) and Task 2 (people search / reachout).
-- **Module 2 — Candidate Core:** one global Candidate identity shared by manual Task-1 candidates and future Task-2 provider-sourced people.
+- **Module 2 — Candidate Core:** one global Candidate identity shared by manual Task-1 candidates and Task-2 provider-sourced people.
+- **Module 3 — People Search & Contact Enrichment:** READY-Job-bound Apollo search evidence, deliberate enrichment, asynchronous phone recovery, and Candidate Core resolution.
 
 ## Core Module 1 invariant
 
@@ -46,6 +47,29 @@ Task 2 sourced person ───┘            |
 
 Candidate Core is global and Job-independent. Email/phone are optional strong identifiers, provider identity is stored separately, and name/title/company/location similarity never auto-merges people.
 
+
+## Core Module 3 invariant
+
+```text
+Approved Job vN
+      |
+      v
+Apollo People Search
+      |
+      v
+Sourcing evidence only
+      | recruiter explicitly enriches
+      v
+Apollo enrichment + phone recovery
+      |
+      v
+Module 2 canonical Candidate
+```
+
+Raw search hits never create Candidates, unsupported Job requirements remain visible rather than
+being silently mapped to different Apollo semantics, and uncertain credit-consuming enrichment is
+never automatically replayed.
+
 ## Architecture
 
 ```text
@@ -61,7 +85,10 @@ Next.js / React / TypeScript / shadcn-style UI
     work_items      jobs         candidates
                     |               |
           job_definition_versions  candidate_external_identities
-          (immutable snapshots)    (provider identity links)
+                    |
+              sourcing_runs
+                 /      \
+       sourcing_results  sourcing_enrichments
 ```
 
 ## State ownership
@@ -75,6 +102,10 @@ Next.js / React / TypeScript / shadcn-style UI
 - `candidates` owns the mutable global Candidate profile and `revision` concurrency token.
 - `candidate_external_identities` separates provider/person identity from canonical Candidate truth.
 - Candidate contact values are optional; contact readiness is derived rather than persisted as another state machine.
+- `sourcing_runs` owns historical search execution bound to one immutable approved Job version.
+- `sourcing_results` owns contact-free provider search evidence only.
+- `sourcing_enrichments` owns one logical credit-aware enrichment per selected search result.
+- Candidate contact truth remains in Module 2; Module 3 stores only Candidate links and provider workflow state.
 
 ## AI analysis
 
@@ -96,6 +127,20 @@ GEMINI_READ_TIMEOUT_SECONDS=60
 
 Manual Job creation remains fully usable when Gemini is not configured or unavailable.
 
+Optional Module 3 Apollo search/enrichment:
+
+```env
+APOLLO_API_KEY=
+APOLLO_API_BASE_URL=https://api.apollo.io/api/v1
+APOLLO_WEBHOOK_BASE_URL=https://your-public-api.example.com
+APOLLO_WEBHOOK_SIGNING_SECRET=
+APOLLO_SEARCH_READ_TIMEOUT_SECONDS=30
+APOLLO_ENRICHMENT_READ_TIMEOUT_SECONDS=60
+SOURCING_SEARCH_STALE_SECONDS=300
+```
+
+`APOLLO_WEBHOOK_BASE_URL` must be public HTTPS when asynchronous phone reveal is exercised.
+
 ## Repository layout
 
 ```text
@@ -107,6 +152,8 @@ apps/
       candidates/
       integrations/
         gemini/
+        apollo/
+      sourcing/
       work_items/
       worker/
     tests/
@@ -114,24 +161,30 @@ apps/
     app/
       jobs/
       candidates/
+      sourcing/
     components/
       jobs/
       candidates/
+      sourcing/
       ui/
     lib/
       jobs/
       candidates/
+      sourcing/
 supabase/
   migrations/
 scripts/
   validate_module_0.py
   validate_module_1.py
   validate_module_2.py
+  validate_module_3.py
 doc/
   MODULE_1_IMPLEMENTATION_PLAN.md
   MODULE_1_VALIDATION.md
   MODULE_2_IMPLEMENTATION_PLAN.md
   MODULE_2_VALIDATION.md
+  MODULE_3_IMPLEMENTATION_PLAN.md
+  MODULE_3_VALIDATION.md
 ```
 
 ## 1. Prerequisites
@@ -152,7 +205,7 @@ supabase db reset
 supabase status
 ```
 
-`supabase db reset` must apply all Module 0–2 migration files from an empty local database.
+`supabase db reset` must apply all Module 0–3 migration files from an empty local database.
 
 Use the local Postgres URL from `supabase status`, for example:
 
@@ -212,7 +265,7 @@ Run API:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Run the Module 0 worker separately when required by later modules:
+Run the durable worker separately for Module 3 enrichment/poll recovery:
 
 ```bash
 python -m app.worker.main
@@ -235,6 +288,7 @@ Open:
 ```text
 http://localhost:3000/jobs
 http://localhost:3000/candidates
+http://localhost:3000/jobs
 ```
 
 ## 5. Module 1 validation
@@ -312,6 +366,8 @@ Backend-only secrets:
 ```text
 DATABASE_URL
 GEMINI_API_KEY
+APOLLO_API_KEY
+APOLLO_WEBHOOK_SIGNING_SECRET
 ```
 
 Never expose them through `NEXT_PUBLIC_*`.
@@ -322,13 +378,11 @@ New tables have RLS enabled and browser roles revoked; the frontend accesses the
 
 ## 8. Explicitly not implemented yet
 
-- Candidate identity/core
 - Candidate↔Job relationship
-- People-search/enrichment providers
 - Candidate matching / shortlisting
 - Hunar Voice API calls
 - outreach lifecycle
-- webhooks / call-result recovery
+- screening/call-result recovery
 - screening answers dashboard
 - authentication / RBAC
 
@@ -352,7 +406,7 @@ $env:TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 python -m pytest -q
 ```
 
-With backend dependencies and migrated local Supabase available, all 83 current backend tests should execute rather than environment-skip.
+The qualified Module 2 baseline executed 87 backend tests with its dependencies and migrated disposable Postgres available. The current Module 0–3 suite is larger; use the Module 3 validation section below for the current total.
 
 Manual Candidate Core smoke:
 
@@ -371,3 +425,47 @@ npm run web:typecheck
 npm run web:test
 npm run web:build
 ```
+
+## 9. Module 3 validation
+
+Structural validation:
+
+```bash
+python scripts/validate_module_3.py
+```
+
+Backend regression and hosted/disposable Postgres qualification:
+
+```powershell
+cd apps\api
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+ruff check .
+mypy app
+$env:TEST_DATABASE_URL="YOUR_DISPOSABLE_HOSTED_SUPABASE_DATABASE_URL"
+python -m pytest -q
+```
+
+With all optional/runtime dependencies and the migrated disposable database available, the current
+Module 0–3 suite should execute 127 tests rather than environment-skipping Postgres/phone cases.
+
+Frontend:
+
+```bash
+npm run web:lint
+npm run web:typecheck
+npm run web:test
+npm run web:build
+```
+
+Manual Module 3 smoke:
+
+1. Confirm DRAFT Jobs cannot start new sourcing.
+2. Mark a Job READY and use **Find people**.
+3. Verify persisted mapped/unmapped criteria and that search results do not create Candidates.
+4. Enrich one selected result; repeated submit must return the same logical enrichment.
+5. Run the worker and verify synchronous Candidate resolution plus asynchronous phone recovery.
+6. Confirm `CONFLICT`, `NOT_FOUND`, `FAILED`, and `UNKNOWN` states fail closed.
+7. Reopen the Job and verify historical runs remain readable while new sourcing is blocked.
+
+See `doc/MODULE_3_VALIDATION.md` for hosted Supabase, webhook/poll, concurrency, and live-Apollo gates.

@@ -1,3 +1,5 @@
+"""Shared provider HTTP transport with explicit outcome classification and no retries."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,12 +21,16 @@ from app.core.retry import (
 
 @dataclass(frozen=True)
 class HttpTimeouts:
+    """Provider HTTP timeout values converted into one httpx timeout contract."""
+
     connect: float = 5.0
     read: float = 20.0
     write: float = 10.0
     pool: float = 5.0
 
     def to_httpx(self) -> httpx.Timeout:
+        """Convert the immutable timeout values into an ``httpx.Timeout`` instance."""
+
         return httpx.Timeout(
             connect=self.connect,
             read=self.read,
@@ -35,6 +41,8 @@ class HttpTimeouts:
 
 
 def parse_retry_after(value: str | None) -> float | None:
+    """Parse seconds or HTTP-date ``Retry-After`` values into a non-negative delay."""
+
     if not value:
         return None
     try:
@@ -76,6 +84,8 @@ class ProviderHttpClient:
         )
 
     def close(self) -> None:
+        """Close the underlying synchronous HTTP client."""
+
         self._client.close()
 
     def __enter__(self) -> ProviderHttpClient:
@@ -84,7 +94,20 @@ class ProviderHttpClient:
     def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
         self.close()
 
-    def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        allowed_statuses: set[int] | None = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Send one provider request without retrying it.
+
+        ``allowed_statuses`` exists for provider endpoints where a non-2xx HTTP status carries
+        documented semantic state, such as Apollo's 404 ``result_pending`` polling response.
+        """
+
         try:
             response = self._client.request(method, path, **kwargs)
         except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
@@ -106,11 +129,38 @@ class ProviderHttpClient:
                 operation_may_have_completed=True,
             ) from exc
 
-        self._raise_for_provider_status(response)
+        if allowed_statuses is None or response.status_code not in allowed_statuses:
+            self._raise_for_provider_status(response)
         return response
 
     def request_json(self, method: str, path: str, **kwargs: Any) -> Any:
+        """Return decoded provider JSON after standard status classification."""
+
         response = self.request(method, path, **kwargs)
+        return self._decode_json(response)
+
+    def request_json_with_status(
+        self,
+        method: str,
+        path: str,
+        *,
+        allowed_statuses: set[int],
+        **kwargs: Any,
+    ) -> tuple[int, Any]:
+        """Return status and JSON when documented semantic non-2xx statuses are allowed."""
+
+        response = self.request(
+            method,
+            path,
+            allowed_statuses=allowed_statuses,
+            **kwargs,
+        )
+        return response.status_code, self._decode_json(response)
+
+    @staticmethod
+    def _decode_json(response: httpx.Response) -> Any:
+        """Decode one provider response body while preserving the shared invalid-JSON error."""
+
         if response.status_code == 204 or not response.content:
             return None
         try:

@@ -20,6 +20,7 @@ from app.jobs.models import Job, JobDefinitionVersion
 from app.jobs.schemas import (
     JobCreateRequest,
     JobDefinitionEdit,
+    JobStatus,
     ScreeningAnswerType,
     ScreeningQuestionCreate,
     ScreeningQuestionEdit,
@@ -61,7 +62,9 @@ class FakeJobRepository:
         del session
         return self.jobs.get(job_id)
 
-    def list(self, session: Any, *, status, limit: int, offset: int):  # type: ignore[no-untyped-def]
+    def list(
+        self, session: Any, *, status, limit: int, offset: int
+    ):  # type: ignore[no-untyped-def]
         del session
         values = list(self.jobs.values())
         if status is not None:
@@ -285,3 +288,26 @@ def test_duplicate_question_key_uses_stable_domain_error() -> None:
             ),
         )
     assert exc_info.value.code == "SCREENING_QUESTION_KEY_DUPLICATE"
+
+
+def test_downstream_binding_lock_returns_exact_ready_snapshot_without_mutation() -> None:
+    service, _ = create_service()
+    created = create_draft(service)
+    question_id = created.screening_questions[0].id
+    ready = service.mark_ready(
+        created.id,
+        expected_revision=0,
+        definition=definition(questions=[question(question_id=question_id)]),
+    )
+
+    snapshot = service.lock_ready_definition_for_downstream_binding(created.id)
+
+    assert snapshot.job_id == created.id
+    assert snapshot.version == 1
+    current = service.get_job(created.id)
+    assert current.status is JobStatus.READY
+    assert current.revision == ready.revision
+
+    service.reopen(created.id, expected_revision=ready.revision)
+    with pytest.raises(JobNotReadyError):
+        service.lock_ready_definition_for_downstream_binding(created.id)

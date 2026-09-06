@@ -1,3 +1,5 @@
+"""Unit tests for durable work-item state transitions and stale recovery semantics."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -144,3 +146,26 @@ def test_unclassified_error_becomes_unknown(monkeypatch) -> None:
 
     _runner(repo, handler).process_one()
     assert repo.outcome[0] == WorkItemStatus.UNKNOWN
+
+
+def test_stale_recovery_invokes_domain_reconciliation_hook(monkeypatch) -> None:
+    _fake_session_scope(monkeypatch)
+    repo = FakeRepository()
+    calls: list[str] = []
+    registry = WorkHandlerRegistry()
+    settings = Settings(
+        database_url="postgresql://user:pass@localhost/db",
+        app_env="test",
+        worker_poll_interval_seconds=0.01,
+        worker_lease_seconds=30,
+    )
+    runner = WorkerRunner(
+        registry=registry,
+        repository=repo,
+        settings=settings,
+        worker_id="test-worker",
+        after_stale_recovery=lambda: calls.append("reconciled"),
+    )
+
+    assert runner.recover_stale_work() == 0
+    assert calls == ["reconciled"]

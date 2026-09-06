@@ -12,6 +12,7 @@ from app.core.errors import DatabaseUnavailableError, register_exception_handler
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
 from app.jobs.router import router as jobs_router
+from app.sourcing.router import router as sourcing_router
 
 
 def create_app() -> FastAPI:
@@ -22,7 +23,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Hunar Hiring Assistant API",
-        version="0.3.0",
+        version="0.4.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
@@ -39,13 +40,18 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(jobs_router)
     app.include_router(candidates_router)
+    app.include_router(sourcing_router)
 
     @app.get("/api/v1/health/live", tags=["health"])
     def live() -> dict[str, str]:
+        """Return process liveness without contacting external dependencies."""
+
         return {"status": "ok"}
 
     @app.get("/api/v1/health/ready", tags=["health"])
     def ready() -> dict[str, str]:
+        """Return readiness only when the configured PostgreSQL database is reachable."""
+
         try:
             check_database_connection()
         except Exception as exc:

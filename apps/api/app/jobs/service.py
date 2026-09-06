@@ -172,6 +172,29 @@ class JobService:
 
         return self._to_job_response(job)
 
+    def lock_ready_definition_for_downstream_binding(
+        self,
+        job_id: UUID,
+    ) -> ApprovedJobDefinition:
+        """Lock a READY Job and return its approved snapshot for atomic downstream binding.
+
+        The caller must already own the surrounding transaction. This method deliberately does
+        not commit so downstream services can create their bound record before releasing the Job
+        row lock.
+        """
+
+        job = self._require_locked_job(job_id)
+        if JobStatus(job.status) is not JobStatus.READY or job.approved_version is None:
+            raise JobNotReadyError()
+        snapshot = self._repository.get_definition_version(
+            self._session,
+            job_id=job.id,
+            version=job.approved_version,
+        )
+        if snapshot is None:
+            raise RuntimeError("READY job references a missing approved definition snapshot")
+        return self._to_approved_definition(snapshot)
+
     def require_ready_definition(self, job_id: UUID) -> ApprovedJobDefinition:
         """Return the current approved snapshot only when the Job is presently READY."""
 

@@ -188,6 +188,10 @@ describe("JobEditor", () => {
 
     renderEditor(current);
     expect(screen.getByLabelText("Job title")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Find people" })).toHaveAttribute(
+      "href",
+      `/jobs/${current.id}/sourcing`,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Reopen to edit" }));
     await waitFor(() => expect(screen.getByLabelText("Job title")).not.toBeDisabled());

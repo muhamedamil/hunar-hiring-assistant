@@ -1,1 +1,1 @@
-# Module 3 placeholder. No people-search business logic belongs to Module 0.
+"""Module 3 Job-bound people search and contact-enrichment workflows."""

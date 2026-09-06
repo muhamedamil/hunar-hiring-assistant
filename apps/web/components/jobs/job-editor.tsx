@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
@@ -339,10 +340,15 @@ export function JobEditor({ initialJob }: { initialJob?: Job }) {
             Build one approved hiring definition that both candidate sourcing and voice screening will consume.
           </p>
         </div>
-        {isReady ? (
-          <Button type="button" variant="outline" disabled={pending} onClick={handleReopen}>
-            Reopen to edit
-          </Button>
+        {isReady && job ? (
+          <div className="flex flex-wrap gap-2">
+            <Button asChild type="button">
+              <Link href={`/jobs/${job.id}/sourcing`}>Find people</Link>
+            </Button>
+            <Button type="button" variant="outline" disabled={pending} onClick={handleReopen}>
+              Reopen to edit
+            </Button>
+          </div>
         ) : null}
       </div>
 
