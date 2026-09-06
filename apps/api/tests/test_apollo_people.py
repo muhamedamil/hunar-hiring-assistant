@@ -182,6 +182,85 @@ def test_enrichment_accepts_negative_signed_64_bit_request_id() -> None:
     assert response.person is not None
 
 
+def test_enrichment_normalizes_documented_professional_evidence_without_contact_data() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            json={
+                "request_id": 123,
+                "person": {
+                    "id": "person-1",
+                    "name": "Sarah Ahmed",
+                    "title": "Backend Engineer",
+                    "email": "sarah@example.com",
+                    "phone_numbers": [{"raw_number": "+1 202-555-0116"}],
+                    "linkedin_url": "https://www.linkedin.com/in/sarah-ahmed",
+                    "city": "Bengaluru",
+                    "country": "India",
+                    "organization": {"name": "Acme", "extra": "ignored"},
+                    "employment_history": [
+                        {
+                            "title": "Backend Engineer",
+                            "organization_name": "Acme",
+                            "start_date": "2024-01-01",
+                            "current": True,
+                            "email": "work@example.com",
+                        },
+                        {
+                            "title": "Software Engineer",
+                            "organization_name": "Previous Co",
+                            "start_date": None,
+                            "current": False,
+                        },
+                        {"title": "Intern", "start_date": "not-a-date"},
+                        {"unexpected": "ignored"},
+                        "malformed optional entry",
+                    ],
+                },
+                "unexpected": {"raw": "ignored"},
+            },
+        )
+
+    response = provider(handler).enrich_person(
+        external_person_id="person-1",
+        webhook_url="https://example.test/webhook",
+    )
+
+    assert response.professional_evidence is not None
+    evidence = response.professional_evidence
+    assert evidence.current_title == "Backend Engineer"
+    assert evidence.current_organization_name == "Acme"
+    assert evidence.location == "Bengaluru, India"
+    assert len(evidence.employment_history) == 3
+    assert str(evidence.employment_history[0].started_at) == "2024-01-01"
+    assert evidence.employment_history[1].started_at is None
+    assert evidence.employment_history[2].started_at is None
+    serialized = evidence.model_dump(mode="json")
+    assert "email" not in json.dumps(serialized)
+    assert "phone" not in json.dumps(serialized)
+
+
+def test_enrichment_missing_employment_history_normalizes_to_empty_list() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            json={
+                "request_id": 123,
+                "person": {"id": "person-1", "name": "Sarah Ahmed"},
+            },
+        )
+
+    response = provider(handler).enrich_person(
+        external_person_id="person-1",
+        webhook_url="https://example.test/webhook",
+    )
+
+    assert response.professional_evidence is not None
+    assert response.professional_evidence.employment_history == []
+
+
 def test_poll_preserves_result_pending_semantics_instead_of_generic_404() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path.endswith("/webhook_result/123")

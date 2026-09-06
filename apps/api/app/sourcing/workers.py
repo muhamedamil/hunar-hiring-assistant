@@ -29,6 +29,8 @@ from app.sourcing.models import SourcingEnrichment
 from app.sourcing.provider import PeopleEnrichmentProvider
 from app.sourcing.repository import SourcingRepository
 from app.sourcing.schemas import (
+    PROFESSIONAL_EVIDENCE_VERSION,
+    CandidateProfessionalEvidence,
     EnrichmentStatus,
     ProviderEnrichedPerson,
     ProviderPollStatus,
@@ -147,6 +149,7 @@ class SourcingWorkHandlers:
             enrichment_id,
             candidate_id=candidate.id,
             request_id=response.request_id,
+            professional_evidence=response.professional_evidence,
         )
 
     def handle_enrichment_poll(self, item: WorkItem) -> None:
@@ -389,6 +392,7 @@ class SourcingWorkHandlers:
         *,
         candidate_id: UUID,
         request_id: int,
+        professional_evidence: CandidateProfessionalEvidence | None,
     ) -> None:
         with self._session_factory() as session, session.begin():
             enrichment = self._require_locked_enrichment(session, enrichment_id)
@@ -398,6 +402,9 @@ class SourcingWorkHandlers:
             enrichment.status = EnrichmentStatus.AWAITING_PHONE.value
             enrichment.candidate_id = candidate_id
             enrichment.provider_request_id = request_id
+            if professional_evidence is not None:
+                enrichment.professional_evidence = professional_evidence.model_dump(mode="json")
+                enrichment.evidence_version = PROFESSIONAL_EVIDENCE_VERSION
             enrichment.failure_code = None
             enrichment.retry_after_seconds = None
             enrichment.updated_at = now

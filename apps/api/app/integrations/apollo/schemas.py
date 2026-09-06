@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 
@@ -23,6 +23,18 @@ def parse_datetime(value: object) -> datetime | None:
         return None
     try:
         return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def parse_date(value: object) -> date | None:
+    """Parse one optional ISO date without making malformed professional metadata fatal."""
+
+    text = optional_text(value)
+    if text is None:
+        return None
+    try:
+        return date.fromisoformat(text)
     except ValueError:
         return None
 

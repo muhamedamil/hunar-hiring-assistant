@@ -11,12 +11,15 @@ from app.core.retry import ProviderInvalidResponseError
 from app.integrations.apollo.errors import ApolloAmbiguousEnrichmentError
 from app.integrations.apollo.schemas import (
     optional_text,
+    parse_date,
     parse_datetime,
     require_list,
     require_object,
 )
 from app.sourcing.schemas import (
+    CandidateProfessionalEvidence,
     PhoneAvailability,
+    ProfessionalExperienceEvidence,
     ProviderEnrichedPerson,
     ProviderEnrichmentResponse,
     ProviderPhoneNumber,
@@ -294,7 +297,12 @@ class ApolloPeopleProvider:
                     "linkedin_url": optional_text(person.get("linkedin_url")),
                 }
             )
-            return ProviderEnrichmentResponse(person=enriched, request_id=request_id)
+            professional_evidence = self._professional_evidence(person, enriched)
+            return ProviderEnrichmentResponse(
+                person=enriched,
+                request_id=request_id,
+                professional_evidence=professional_evidence,
+            )
         except (TypeError, ValueError) as exc:
             raise ProviderInvalidResponseError(
                 code="APOLLO_ENRICHMENT_RESPONSE_INVALID",
@@ -310,6 +318,40 @@ class ApolloPeopleProvider:
         ]
         values = [part for part in parts if part]
         return ", ".join(values) if values else None
+
+    @staticmethod
+    def _professional_evidence(
+        person: dict[str, Any],
+        enriched: ProviderEnrichedPerson,
+    ) -> CandidateProfessionalEvidence:
+        history_value = person.get("employment_history", [])
+        history: list[ProfessionalExperienceEvidence] = []
+        if isinstance(history_value, list):
+            for value in history_value[:100]:
+                if not isinstance(value, dict):
+                    continue
+                title = optional_text(value.get("title"))
+                organization_name = optional_text(value.get("organization_name"))
+                started_at = parse_date(value.get("start_date"))
+                current = value.get("current")
+                is_current = current if isinstance(current, bool) else None
+                if not any((title, organization_name, started_at, is_current is not None)):
+                    continue
+                history.append(
+                    ProfessionalExperienceEvidence(
+                        title=title,
+                        organization_name=organization_name,
+                        started_at=started_at,
+                        is_current=is_current,
+                    )
+                )
+        return CandidateProfessionalEvidence(
+            current_title=enriched.title,
+            current_organization_name=enriched.company,
+            location=enriched.location,
+            profile_url=enriched.linkedin_url,
+            employment_history=history,
+        )
 
     @staticmethod
     def _parse_request_id(value: object, *, required: bool) -> int | None:

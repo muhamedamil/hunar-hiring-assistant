@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -15,7 +16,14 @@ from app.core.retry import (
     ProviderTransportError,
     RetryableWorkError,
 )
-from app.sourcing.schemas import ProviderEnrichedPerson, ProviderEnrichmentResponse
+from app.sourcing.schemas import (
+    CandidateProfessionalEvidence,
+    ProviderEnrichedPerson,
+    ProviderEnrichmentResponse,
+    ProviderPhoneResult,
+    ProviderPollResult,
+    ProviderPollStatus,
+)
 from app.sourcing.workers import SourcingWorkHandlers
 from app.work_items.models import WorkItem
 
@@ -43,6 +51,10 @@ class SuccessfulProvider:
                 full_name="Sarah Ahmed",
             ),
             request_id=-7,
+            professional_evidence=CandidateProfessionalEvidence(
+                current_title="Backend Engineer",
+                employment_history=[],
+            ),
         )
 
 
@@ -210,6 +222,33 @@ def test_candidate_identity_conflict_marks_enrichment_conflict_without_merge(
     assert transitions == ["CANDIDATE_IDENTITY_CONFLICT"]
 
 
+def test_synchronous_professional_evidence_is_persisted_before_phone_completion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = handlers(SuccessfulProvider())
+    prepare_without_database(worker, monkeypatch)
+    candidate_id = uuid4()
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        worker,
+        "_resolve_candidate",
+        lambda person: SimpleNamespace(id=candidate_id),
+    )
+    monkeypatch.setattr(
+        worker,
+        "_mark_awaiting_phone",
+        lambda enrichment_id, **values: captured.update(values),
+    )
+
+    worker.handle_people_enrichment(work_item())
+
+    assert captured["candidate_id"] == candidate_id
+    assert captured["request_id"] == -7
+    evidence = captured["professional_evidence"]
+    assert isinstance(evidence, CandidateProfessionalEvidence)
+    assert evidence.current_title == "Backend Engineer"
+
+
 class RateLimitedPollProvider:
     """Simulate a rate-limited read-only poll observer."""
 
@@ -220,6 +259,20 @@ class RateLimitedPollProvider:
             message="rate limited",
             status_code=429,
             retry_after_seconds=7,
+        )
+
+
+class CompletedPollProvider:
+    """Return one completed zero-credit poll result for shared-finalizer verification."""
+
+    def poll_enrichment(self, request_id: int) -> ProviderPollResult:
+        return ProviderPollResult(
+            status=ProviderPollStatus.COMPLETED,
+            phone_result=ProviderPhoneResult(
+                request_id=request_id,
+                external_person_id="person-1",
+                phones=[],
+            ),
         )
 
 
@@ -289,3 +342,26 @@ def test_poll_retry_exhaustion_leaves_webhook_authority_open(
 
     assert exc_info.value.code == "APOLLO_POLL_ATTEMPTS_EXHAUSTED"
     assert transitions == ["observer:APOLLO_POLL_ATTEMPTS_EXHAUSTED:None"]
+
+
+def test_completed_poll_uses_same_idempotent_finalizer_as_webhook(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = handlers(CompletedPollProvider())
+    enrichment_id = poll_work_item().entity_id
+    assert enrichment_id is not None
+    finalized: list[tuple[object, ProviderPhoneResult]] = []
+    monkeypatch.setattr(worker, "_load_poll_request_id", lambda value: -7)
+    monkeypatch.setattr(
+        worker._webhooks,  # noqa: SLF001
+        "finalize_phone_result",
+        lambda value, result: finalized.append((value, result)),
+    )
+    item = poll_work_item()
+    item.entity_id = enrichment_id
+
+    worker.handle_enrichment_poll(item)
+
+    assert len(finalized) == 1
+    assert finalized[0][0] == enrichment_id
+    assert finalized[0][1].request_id == -7
