@@ -34,6 +34,18 @@ class CandidateRepository:
         )
         return session.execute(statement).scalar_one_or_none()
 
+    def list_by_ids(
+        self,
+        session: Session,
+        candidate_ids: set[UUID],
+    ) -> list[Candidate]:
+        """Return canonical Candidates for a bounded identifier set."""
+
+        if not candidate_ids:
+            return []
+        statement = select(Candidate).where(Candidate.id.in_(candidate_ids))
+        return list(session.execute(statement).scalars())
+
     def list(
         self,
         session: Session,

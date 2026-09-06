@@ -20,6 +20,7 @@ from app.candidates.schemas import (
     CandidateCreateRequest,
     CandidateExternalIdentityResponse,
     CandidateListResponse,
+    CandidateMatchingSnapshot,
     CandidateProfileInput,
     CandidateResponse,
     CandidateSummaryResponse,
@@ -103,6 +104,36 @@ class CandidateService:
             raise CandidateNotFoundError()
         identities = self._repository.list_external_identities(self._session, candidate.id)
         return self._to_candidate_response(candidate, identities)
+
+    def lock_matching_snapshot_for_downstream_binding(
+        self,
+        candidate_id: UUID,
+    ) -> CandidateMatchingSnapshot:
+        """Lock a Candidate and return only evidence Module 4 is allowed to consume.
+
+        The caller must already own the surrounding transaction. Contact values are deliberately
+        excluded; only callable presence is projected for downstream call-readiness display.
+        """
+
+        candidate = self._require_locked_candidate(candidate_id)
+        return self._to_matching_snapshot(candidate)
+
+    def get_matching_snapshot(self, candidate_id: UUID) -> CandidateMatchingSnapshot:
+        """Return current matching evidence without exposing Candidate contact PII."""
+
+        candidate = self._repository.get_by_id(self._session, candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError()
+        return self._to_matching_snapshot(candidate)
+
+    def get_summaries_by_ids(
+        self,
+        candidate_ids: set[UUID],
+    ) -> dict[UUID, CandidateSummaryResponse]:
+        """Return PII-minimized Candidate summaries keyed by canonical identifier."""
+
+        candidates = self._repository.list_by_ids(self._session, candidate_ids)
+        return {candidate.id: self._to_summary_response(candidate) for candidate in candidates}
 
     def update_candidate(
         self,
@@ -390,6 +421,18 @@ class CandidateService:
     @classmethod
     def _is_identity_integrity_error(cls, exc: IntegrityError) -> bool:
         return cls._constraint_name(exc) in _IDENTITY_CONSTRAINTS
+
+    @staticmethod
+    def _to_matching_snapshot(candidate: Candidate) -> CandidateMatchingSnapshot:
+        """Project the exact canonical Candidate evidence consumed by Module 4."""
+
+        return CandidateMatchingSnapshot(
+            candidate_id=candidate.id,
+            candidate_revision=candidate.revision,
+            current_title=candidate.current_title,
+            location=candidate.location,
+            has_phone=candidate.phone_e164 is not None,
+        )
 
     @staticmethod
     def _to_candidate_response(

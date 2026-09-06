@@ -344,3 +344,17 @@ class MatchingProfessionalEvidenceSource(BaseModel):
     definition_version: int = Field(ge=1)
     professional_evidence: CandidateProfessionalEvidence
     evidence_version: str = Field(min_length=1, max_length=80)
+
+
+class ResolvedSourcingCandidateEvidenceSource(BaseModel):
+    """Resolved Candidate provenance for Module 4, with professional evidence when available."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: UUID
+    sourcing_result_id: UUID
+    sourcing_run_id: UUID
+    job_id: UUID
+    definition_version: int = Field(ge=1)
+    professional_evidence: CandidateProfessionalEvidence | None = None
+    evidence_version: str | None = Field(default=None, min_length=1, max_length=80)

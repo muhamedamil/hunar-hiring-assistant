@@ -40,6 +40,7 @@ from app.sourcing.schemas import (
     PhoneAvailability,
     ProviderSearchPage,
     ProviderSearchQuery,
+    ResolvedSourcingCandidateEvidenceSource,
     SourcingEnrichmentResponse,
     SourcingResultResponse,
     SourcingRunDetailResponse,
@@ -216,6 +217,40 @@ class SourcingService:
         if enrichment is None:
             raise SourcingEnrichmentNotFoundError()
         return self._to_enrichment_response(enrichment)
+
+    def get_resolved_candidate_evidence_source(
+        self,
+        result_id: UUID,
+    ) -> ResolvedSourcingCandidateEvidenceSource | None:
+        """Return resolved Candidate provenance even when professional evidence is absent."""
+
+        result = self._repository.get_result(self._session, result_id)
+        if result is None:
+            raise SourcingResultNotFoundError()
+        if result.candidate_id is None:
+            return None
+        run = self._repository.get_run(self._session, result.sourcing_run_id)
+        if run is None:
+            raise RuntimeError("Sourcing result references a missing sourcing run")
+        enrichment = self._repository.get_enrichment_by_result(self._session, result.id)
+        professional_evidence = None
+        evidence_version = None
+        if enrichment is not None:
+            professional_evidence = (
+                CandidateProfessionalEvidence.model_validate(enrichment.professional_evidence)
+                if enrichment.professional_evidence is not None
+                else None
+            )
+            evidence_version = enrichment.evidence_version
+        return ResolvedSourcingCandidateEvidenceSource(
+            candidate_id=result.candidate_id,
+            sourcing_result_id=result.id,
+            sourcing_run_id=run.id,
+            job_id=run.job_id,
+            definition_version=run.definition_version,
+            professional_evidence=professional_evidence,
+            evidence_version=evidence_version,
+        )
 
     def get_matching_evidence_for_sourcing_result(
         self,

@@ -127,6 +127,18 @@ class CandidateListResponse(BaseModel):
     offset: int
 
 
+class CandidateMatchingSnapshot(BaseModel):
+    """Minimal canonical Candidate evidence consumed by downstream matching."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: UUID
+    candidate_revision: int = Field(ge=0)
+    current_title: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    has_phone: bool
+
+
 class ExternalCandidateObservation(BaseModel):
     """Provider-neutral person observation consumed internally by future sourcing modules."""
 
