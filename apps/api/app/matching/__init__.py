@@ -1,1 +1,1 @@
-# Module 4 placeholder. No matching business logic belongs to Module 0.
+"""Module 4 Candidate↔Job matching and recruiter shortlist domain package."""
