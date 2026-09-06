@@ -244,3 +244,30 @@ The implementation audit added bounded corrections without changing module owner
 8. stale `SEARCHING` recovery uses a persisted `search_generation` token. A manual stale-search
    retry advances the generation, and late success/failure from an older in-flight read-only search
    is ignored so execution topology cannot overwrite newer authoritative run state.
+
+## Pre-Module-4 evidence enrichment patch
+
+The additive patch keeps Apollo result order intact while projecting an ordinal, non-hiring
+recommendation from each run's persisted title criteria and search-only evidence. Exact primary
+title plus Apollo's positive phone-availability signal is `recommended`; exact primary title
+without that signal and exact alternate title are `possible`; missing or non-exact title is
+`low_priority` regardless of contactability. Structured reasons expose every signal. The pure
+algorithm is versioned as `search_evidence_priority_v1`; its output is not persisted because the
+run already retains every input needed to reproduce it.
+
+Apollo's documented `/people/match` response also contains professional evidence that the original
+adapter discarded. The same existing response is now normalized to current title, current
+organization, personal location, professional profile URL, and employment-history title,
+organization, start date, and current marker. Unsupported or unconfirmed fields, including an
+employment end date, are not inferred. Email, phone, and raw provider JSON are excluded.
+
+The normalized object and `professional_evidence_v1` contract version are stored on the existing
+one-per-result `sourcing_enrichments` row as soon as synchronous Candidate resolution succeeds.
+Async phone webhook/poll finalization does not write those columns. A read-only service seam keyed
+by `sourcing_result_id` returns Candidate, Job-version, run, result, evidence, and evidence-version
+provenance for future Module 4 without exposing Module 3 tables directly.
+
+Provider calls and authority remain unchanged: search stays read-only, enrichment still requires
+one explicit recruiter action, `/people/match` is not duplicated, polling remains zero-credit
+recovery, Candidate identity/contact still changes only through Module 2, and Module 4 remains
+unimplemented.

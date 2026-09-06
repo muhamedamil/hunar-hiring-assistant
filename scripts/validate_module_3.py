@@ -16,6 +16,7 @@ REQUIRED_FILES = [
     "apps/api/app/sourcing/mapping.py",
     "apps/api/app/sourcing/models.py",
     "apps/api/app/sourcing/provider.py",
+    "apps/api/app/sourcing/prioritization.py",
     "apps/api/app/sourcing/repository.py",
     "apps/api/app/sourcing/router.py",
     "apps/api/app/sourcing/schemas.py",
@@ -30,6 +31,7 @@ REQUIRED_FILES = [
     "apps/web/lib/sourcing/types.ts",
     "apps/web/tests/sourcing-workspace.test.tsx",
     "supabase/migrations/20260906113000_module_3_people_sourcing.sql",
+    "supabase/migrations/20260906170000_module_3_evidence_enrichment.sql",
 ]
 
 MODULE_3_PYTHON = sorted(
@@ -117,6 +119,19 @@ def validate_schema_authority() -> None:
     if "email text" in migration or "phone_e164" in migration:
         fail("Sourcing tables must not duplicate Candidate contact truth")
 
+    evidence_migration = read(
+        "supabase/migrations/20260906170000_module_3_evidence_enrichment.sql"
+    ).lower()
+    for fragment in [
+        "alter table public.sourcing_enrichments",
+        "add column professional_evidence jsonb",
+        "add column evidence_version text",
+        "jsonb_typeof(professional_evidence) = 'object'",
+        "(professional_evidence is null) = (evidence_version is null)",
+    ]:
+        if fragment not in evidence_migration:
+            fail(f"Professional-evidence migration is missing invariant: {fragment}")
+
 
 def validate_job_binding() -> None:
     """Require atomic READY binding without bypassing Module 1's Job authority."""
@@ -170,6 +185,16 @@ def validate_mapping_and_provider_bounds() -> None:
         if fragment not in service:
             fail(f"Stale-search generation guard is missing: {fragment}")
 
+    priority = read("apps/api/app/sourcing/prioritization.py")
+    for fragment in [
+        "search_evidence_priority_v1",
+        "primary_match and contactability_positive",
+        "primary_match or alternate_match",
+        "EnrichmentPriority.LOW_PRIORITY",
+    ]:
+        if fragment not in priority:
+            fail(f"Pre-enrichment priority boundary is missing: {fragment}")
+
 
 def validate_candidate_and_pii_boundaries() -> None:
     """Require Candidate Core resolution and prohibit direct contact/provider-payload ownership."""
@@ -187,6 +212,23 @@ def validate_candidate_and_pii_boundaries() -> None:
             fail(f"Module 3 bypasses Candidate Core authority: {forbidden}")
     if "raw_provider_payload" in sourcing:
         fail("Module 3 must not create a raw provider payload warehouse")
+    for forbidden in [
+        'professional_evidence["email"]',
+        'professional_evidence["phone"]',
+    ]:
+        if forbidden in sourcing:
+            fail(f"Professional evidence contains Candidate contact truth: {forbidden}")
+
+    worker = read("apps/api/app/sourcing/workers.py")
+    service = read("apps/api/app/sourcing/service.py")
+    for fragment in [
+        "professional_evidence.model_dump",
+        "get_matching_evidence_for_sourcing_result",
+        "sourcing_result_id=result.id",
+        "definition_version=run.definition_version",
+    ]:
+        if fragment not in f"{worker}\n{service}":
+            fail(f"Professional-evidence provenance seam is missing: {fragment}")
 
 
 def validate_retry_and_recovery() -> None:
@@ -258,6 +300,7 @@ def validate_regression_tests() -> None:
         read(path)
         for path in [
             "apps/api/tests/test_sourcing_mapping.py",
+            "apps/api/tests/test_sourcing_prioritization.py",
             "apps/api/tests/test_apollo_people.py",
             "apps/api/tests/test_sourcing_service.py",
             "apps/api/tests/test_sourcing_workers.py",
@@ -278,6 +321,9 @@ def validate_regression_tests() -> None:
         "does_not_hide_normalization_runtime_failure",
         "stale_search_retry_advances_generation",
         "superseded_search_generation_cannot_overwrite",
+        "priority_uses_historical_run_criteria_after_job_reapproval",
+        "normalizes_documented_professional_evidence_without_contact_data",
+        "professional_evidence_constraints_and_async_finalization_preserve_snapshot",
     ]:
         if fragment not in tests:
             fail(f"Module 3 proof surface is missing: {fragment}")

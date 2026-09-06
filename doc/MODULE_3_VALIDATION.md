@@ -30,6 +30,14 @@ Modules 0–2.
 - Module 0 stale-work UNKNOWN is projected into Module 3 without weakening generic queue semantics;
 - sourcing tables do not store email/phone truth;
 - no matching, shortlist, or Hunar/outreach lifecycle belongs to Module 3.
+- pre-enrichment priority is a reproducible projection of frozen run criteria and search evidence;
+- phone availability can strengthen only exact primary-title evidence and cannot rescue mismatch;
+- Apollo result order and visibility remain unchanged, and enrichment remains recruiter-triggered;
+- normalized professional evidence comes from the existing `/people/match` response only;
+- evidence excludes raw provider JSON and Candidate contact values;
+- synchronous professional evidence survives awaiting-phone, webhook, poll, and duplicate-finalizer
+  timing because asynchronous finalization never rewrites its columns;
+- future matching reads evidence through the provenance-bound Module 3 service seam.
 
 ## Validation completed in this environment
 
@@ -40,8 +48,10 @@ Module 0 structural validator   PASS
 Module 1 structural validator   PASS
 Module 2 structural validator   PASS
 Module 3 structural validator   PASS
-Backend pytest                  105 passed / 22 environment-gated skips
-Total backend tests             127
+Backend pytest                  124 passed / 20 environment-gated skips
+Total backend tests             144
+Frontend Vitest                 26 passed
+Frontend lint/typecheck/build   PASS
 ```
 
 At the final implementation checkpoint, run:
@@ -98,6 +108,17 @@ npm run web:lint
 npm run web:typecheck
 npm run web:test
 npm run web:build
+```
+
+The evidence patch additionally requires:
+
+```text
+apps/api/tests/test_sourcing_prioritization.py
+Apollo professional-evidence parser cases
+historical Job-version priority projection
+professional-evidence JSON/version constraints
+duplicate async finalization evidence survival
+frontend recommendation/reason rendering
 ```
 
 ## Manual UI qualification
