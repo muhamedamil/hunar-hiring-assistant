@@ -1,6 +1,6 @@
-# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3
+# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3 + 4
 
-This repository contains the application foundation, shared **Job & Screening Definition** authority, global **Candidate Core**, and Job-bound **People Search & Contact Enrichment** workflow for the Hunar.ai hiring-assistant assessment.
+This repository contains the application foundation, shared **Job & Screening Definition** authority, global **Candidate Core**, Job-bound **People Search & Contact Enrichment**, and shared **Candidate ↔ Job Matching & Shortlisting** workflow for the Hunar.ai hiring-assistant assessment.
 
 Current scope:
 
@@ -8,6 +8,7 @@ Current scope:
 - **Module 1 — Job & Screening Definition:** one recruiter-approved hiring definition shared by Task 1 (voice screening) and Task 2 (people search / reachout).
 - **Module 2 — Candidate Core:** one global Candidate identity shared by manual Task-1 candidates and Task-2 provider-sourced people.
 - **Module 3 — People Search & Contact Enrichment:** READY-Job-bound Apollo search evidence, deliberate enrichment, asynchronous phone recovery, and Candidate Core resolution.
+- **Module 4 — Candidate ↔ Job Matching & Shortlisting:** one shared manual/sourced Candidate↔Job relation, immutable version-bound evidence assessment, optional constrained Gemini role/seniority classification, call readiness, and recruiter-owned shortlist truth.
 
 ## Core Module 1 invariant
 
@@ -70,6 +71,28 @@ Raw search hits never create Candidates, unsupported Job requirements remain vis
 being silently mapped to different Apollo semantics, and uncertain credit-consuming enrichment is
 never automatically replayed.
 
+
+## Core Module 4 invariant
+
+```text
+Task 1 Add to READY Job ───────┐
+                               |
+Task 2 Review match ───────────┤
+   (resolved sourcing evidence) v
+                        one job_candidate
+                               |
+                    current READY Job vN
+                               +
+                 available Candidate evidence
+                               |
+                               v
+              automatic initial assessment
+                               |
+                  recruiter shortlist decision
+```
+
+Module 3's pre-enrichment recommendation answers **which search results are worth enriching**. Module 4 answers **how the resolved Candidate fits the approved Job evidence that actually exists**. Missing skills/experience remain `unknown`; phone affects call readiness only and never increases fit score.
+
 ## Architecture
 
 ```text
@@ -89,6 +112,10 @@ Next.js / React / TypeScript / shadcn-style UI
               sourcing_runs
                  /      \
        sourcing_results  sourcing_enrichments
+                    \        /
+                     job_candidates
+                          |
+                  job_candidate_matches
 ```
 
 ## State ownership
@@ -106,6 +133,9 @@ Next.js / React / TypeScript / shadcn-style UI
 - `sourcing_results` owns contact-free provider search evidence only.
 - `sourcing_enrichments` owns one logical credit-aware enrichment per selected search result.
 - Candidate contact truth remains in Module 2; Module 3 stores only Candidate links and provider workflow state.
+- `job_candidates` owns the one stable Candidate↔Job relationship plus current recruiter shortlist state.
+- `job_candidate_matches` owns immutable historical evidence assessments tied to exact approved Job versions and evidence inputs.
+- Module 4 call readiness is derived from canonical Candidate phone truth and does not affect match score.
 
 ## AI analysis
 
@@ -154,6 +184,7 @@ apps/
         gemini/
         apollo/
       sourcing/
+      matching/
       work_items/
       worker/
     tests/
@@ -162,15 +193,18 @@ apps/
       jobs/
       candidates/
       sourcing/
+      job-candidates/
     components/
       jobs/
       candidates/
       sourcing/
+      matching/
       ui/
     lib/
       jobs/
       candidates/
       sourcing/
+      matching/
 supabase/
   migrations/
 scripts/
@@ -178,6 +212,7 @@ scripts/
   validate_module_1.py
   validate_module_2.py
   validate_module_3.py
+  validate_module_4.py
 doc/
   MODULE_1_IMPLEMENTATION_PLAN.md
   MODULE_1_VALIDATION.md
@@ -378,15 +413,13 @@ New tables have RLS enabled and browser roles revoked; the frontend accesses the
 
 ## 8. Explicitly not implemented yet
 
-- Candidate↔Job relationship
-- Candidate matching / shortlisting
 - Hunar Voice API calls
 - outreach lifecycle
 - screening/call-result recovery
 - screening answers dashboard
 - authentication / RBAC
 
-These belong to later modules and must consume the immutable approved Job definition rather than reparsing the raw JD.
+These belong to later modules and must consume the frozen Module 1–4 authorities rather than duplicating Job, Candidate, sourcing, match, or shortlist truth.
 
 
 ## 7. Module 2 validation
@@ -406,7 +439,7 @@ $env:TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 python -m pytest -q
 ```
 
-The qualified Module 2 baseline executed 87 backend tests with its dependencies and migrated disposable Postgres available. The current Module 0–3 suite is larger; use the Module 3 validation section below for the current total.
+The qualified Module 2 baseline executed 87 backend tests with its dependencies and migrated disposable Postgres available. The current cumulative suite is larger; use the latest module validation document for the current gates.
 
 Manual Candidate Core smoke:
 
@@ -469,3 +502,16 @@ Manual Module 3 smoke:
 7. Reopen the Job and verify historical runs remain readable while new sourcing is blocked.
 
 See `doc/MODULE_3_VALIDATION.md` for hosted Supabase, webhook/poll, concurrency, and live-Apollo gates.
+
+
+## 10. Module 4 validation
+
+Structural validation:
+
+```bash
+python scripts/validate_module_4.py
+```
+
+Module 4 adds no Apollo endpoint or automatic enrichment. A new manual relationship is assessed after attachment commits; **Review match** assesses a new sourced relationship or changed preferred sourcing result after that update commits. Repeating the same attachment context returns existing truth without a hidden refresh or provider retry. Optional Gemini analysis remains inside the existing matching authority and runs only when explicit title evidence can improve role/seniority classification. Backend scoring and recruiter shortlist truth remain authoritative.
+
+Run the cumulative backend/database and frontend gates documented in `doc/MODULE_4_VALIDATION.md`. The shared workflow is **Attach/Review match → automatic initial assessment → recruiter review**. The manual smoke must cover both Task-1 manual Candidate attachment and Task-2 resolved sourcing attachment, convergence to one relation, evidence-grounded matching, call-readiness separation, Job reapproval freshness, and recruiter decision reconfirmation.
