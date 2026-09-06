@@ -112,6 +112,20 @@ function run(): SourcingRun {
         organization_name: "Acme",
         email_available: true,
         phone_availability: "available",
+        enrichment_priority: "possible",
+        enrichment_priority_reasons: [
+          {
+            code: "alternate_title_exact",
+            outcome: "positive",
+            detail: "Exact alternate target title",
+          },
+          {
+            code: "phone_available",
+            outcome: "positive",
+            detail: "Phone likely available",
+          },
+        ],
+        enrichment_priority_algorithm_version: "search_evidence_priority_v1",
         candidate_id: null,
         created_at: "2026-09-06T00:00:01Z",
       },
@@ -176,6 +190,9 @@ describe("Module 3 sourcing UI", () => {
     expect(screen.getByText(/required_skills: Python, FastAPI/)).toBeInTheDocument();
     expect(screen.getByText(/seniority: lead/)).toBeInTheDocument();
     expect(screen.getByText("Sarah Ah***d")).toBeInTheDocument();
+    expect(screen.getByText("Possible")).toBeInTheDocument();
+    expect(screen.getByText("Exact alternate target title")).toBeInTheDocument();
+    expect(screen.getByText("Phone likely available")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Apollo search evidence only. Matching and shortlisting happen in a later module.",
@@ -211,6 +228,41 @@ describe("Module 3 sourcing UI", () => {
     await waitFor(() => {
       expect(sourcingApi.enrichSourcingResult).toHaveBeenCalledWith(current.results[0].id);
     });
+  });
+
+  it("keeps low-priority provider results visible and available for explicit enrichment", async () => {
+    const current = run();
+    current.result_count = 2;
+    current.results.push({
+      ...current.results[0],
+      id: "77777777-7777-4777-8777-777777777777",
+      provider_person_id: "apollo-person-2",
+      result_position: 2,
+      first_name: "Jordan",
+      last_name_obfuscated: "Sm***h",
+      current_title: "Account Executive",
+      phone_availability: "available",
+      enrichment_priority: "low_priority",
+      enrichment_priority_reasons: [
+        {
+          code: "title_not_aligned",
+          outcome: "negative",
+          detail: "Current title does not exactly align with target titles",
+        },
+        {
+          code: "phone_available",
+          outcome: "positive",
+          detail: "Phone likely available",
+        },
+      ],
+    });
+    vi.mocked(sourcingApi.getSourcingRun).mockResolvedValue(current);
+    renderWithClient(<SourcingRunWorkspace runId={current.id} />);
+
+    expect(await screen.findByText("Sarah Ah***d")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Sm***h")).toBeInTheDocument();
+    expect(screen.getByText("Low priority")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Enrich contact" })).toHaveLength(2);
   });
 
   it("surfaces failed enrichment without offering a second credit-consuming action", async () => {

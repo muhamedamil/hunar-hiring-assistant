@@ -10,6 +10,13 @@ export type EnrichmentStatus =
   | "conflict";
 
 export type PhoneAvailability = "available" | "maybe" | "unavailable" | "unknown";
+export type EnrichmentPriority = "recommended" | "possible" | "low_priority";
+
+export interface EnrichmentPriorityReason {
+  code: string;
+  outcome: "positive" | "negative" | "unknown";
+  detail: string;
+}
 
 export interface UnmappedRequirement {
   field: string;
@@ -44,6 +51,9 @@ export interface SourcingResult {
   organization_name: string | null;
   email_available: boolean;
   phone_availability: PhoneAvailability;
+  enrichment_priority: EnrichmentPriority;
+  enrichment_priority_reasons: EnrichmentPriorityReason[];
+  enrichment_priority_algorithm_version: string;
   candidate_id: string | null;
   created_at: string;
 }

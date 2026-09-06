@@ -20,6 +20,18 @@ import {
 import { sourcingKeys } from "@/lib/sourcing/queries";
 import type { SourcingEnrichment, SourcingRun } from "@/lib/sourcing/types";
 
+const priorityLabels = {
+  recommended: "Recommended to enrich",
+  possible: "Possible",
+  low_priority: "Low priority",
+} as const;
+
+const priorityStyles = {
+  recommended: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  possible: "border-amber-200 bg-amber-50 text-amber-800",
+  low_priority: "border-slate-200 bg-slate-50 text-slate-700",
+} as const;
+
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
@@ -275,6 +287,18 @@ export function SourcingRunWorkspace({ runId }: { runId: string }) {
                     <p className="mt-2 text-xs text-slate-500">
                       {result.email_available ? "Email may be available" : "Email availability unknown"} · phone {result.phone_availability}
                     </p>
+                    <div
+                      className={`mt-3 rounded-md border p-3 text-sm ${priorityStyles[result.enrichment_priority]}`}
+                    >
+                      <p className="font-medium">
+                        {priorityLabels[result.enrichment_priority]}
+                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                        {result.enrichment_priority_reasons.map((reason) => (
+                          <li key={reason.code}>{reason.detail}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {enrichment ? <SourcingStatusBadge status={enrichment.status} /> : null}
