@@ -1206,3 +1206,335 @@ ownership of the global application release version; its production Module 6 inv
 Current STEP 2 code version is `0.9.0`; migration head remains
 `20260907170000_module_7_call_results.sql`. STEP 3 remains blocked pending real Ruff, mypy, and
 disposable PostgreSQL/EXPLAIN qualification on the final patch-applied tree.
+
+---
+
+## 20. STEP 2 completion — COMPLETE / QUALIFIED / FROZEN
+
+STEP 2 was completed against the authoritative `hunar-hiring-assistant-main (3)(2).zip` baseline and
+then qualified on the final patch-applied local tree. This section records the final executed evidence
+without changing or weakening any frozen Module 8 contract above.
+
+### Exact STEP 2 files created
+
+```text
+apps/api/app/dashboard/__init__.py
+apps/api/app/dashboard/dependencies.py
+apps/api/app/dashboard/repository.py
+apps/api/app/dashboard/router.py
+apps/api/app/dashboard/schemas.py
+apps/api/app/dashboard/service.py
+
+apps/api/tests/test_dashboard_database.py
+apps/api/tests/test_dashboard_router.py
+apps/api/tests/test_dashboard_service.py
+
+doc/MODULE_8_VALIDATION.md
+scripts/validate_module_8.py
+```
+
+### Exact STEP 2 files modified
+
+```text
+README.md
+apps/api/app/main.py
+apps/api/pyproject.toml
+apps/api/uv.lock
+doc/MODULE_8_IMPLEMENTATION_LEDGER.md
+doc/MODULE_8_IMPLEMENTATION_PLAN.md
+scripts/validate_module_6.py
+```
+
+`scripts/validate_module_6.py` changed only to remove stale ownership of the global application version.
+No Module 6 production behavior, schema, endpoint, worker, provider contract, or business authority changed.
+
+### Frozen implementation state
+
+```text
+Backend version:         0.9.0
+Migration head:          20260907170000_module_7_call_results.sql
+Module 8 migration:      NONE
+```
+
+No Module 8 migration was created because representative PostgreSQL qualification did not prove a
+material need for a new dashboard read index.
+
+The implemented dashboard API surface remains exactly:
+
+```text
+GET /api/v1/dashboard/overview
+GET /api/v1/dashboard/screenings
+GET /api/v1/dashboard/screenings/{execution_id}
+```
+
+STEP 2 added **no** dashboard mutation endpoint, dashboard business-state table, worker, provider
+integration, webhook, new business authority, or recruiter frontend implementation.
+
+### Final STEP 2 qualification matrix
+
+| Gate | Final result |
+|---|---|
+| Validators 0–8 | **PASS** |
+| Ruff | **PASS** |
+| mypy | **PASS** |
+| Full backend regression | **PASS** |
+| Focused Module 8 tests | **PASS** |
+| Disposable PostgreSQL qualification | **PASS — 6 passed in 7.75s** |
+| >100 Jobs/Candidates/executions qualification | **PASS — 105 Jobs / 105 Candidates / 106 executions** |
+| Pagination/count parity | **PASS** |
+| Historical Job/context qualification | **PASS** |
+| Multiple outreach/execution qualification | **PASS** |
+| Answer-row non-duplication | **PASS** |
+| Canonical screening-state projection qualification | **PASS** |
+| `count_interested_screenings()` subset qualification | **PASS** |
+| `q` trim/validation qualification | **PASS** |
+| UNKNOWN + terminal-result qualification | **PASS** |
+| HUMAN/MACHINE/UNKNOWN-human answer-safety qualification | **PASS** |
+| Provider-isolation qualification | **PASS** |
+| Unsafe-field/security qualification | **PASS** |
+| Final diff/whitespace/scope audit | **PASS** |
+| Modules 0–7 regression status | **PASS** |
+| Remaining STEP 2 blockers | **NONE** |
+
+### Representative PostgreSQL query-plan qualification
+
+The local disposable PostgreSQL database was explicitly analyzed before the final representative plan:
+
+```text
+ANALYZE public.voice_call_executions
+ANALYZE public.outreach_requests
+ANALYZE public.job_candidates
+ANALYZE public.candidates
+ANALYZE public.job_candidate_matches
+ANALYZE public.job_definition_versions
+ANALYZE public.voice_call_results
+```
+
+The final screening-list `EXPLAIN (ANALYZE, BUFFERS)` completed with:
+
+```text
+Planning Time:   10.139 ms
+Execution Time:   0.768 ms
+Top-N sort:       heapsort, 30 kB
+Shared hits:      771
+Returned rows:    20
+Execution rows:   106
+```
+
+PostgreSQL used existing indexes where materially useful, including:
+
+```text
+uq_voice_call_executions_outreach
+candidates_pkey
+job_definition_versions_job_id_version_key
+uq_voice_call_results_execution
+```
+
+Small relation scans remained sequential/hash-based, which is appropriate at the qualified fixture size.
+The analyzed plan reduced execution time from the pre-ANALYZE 3.867 ms run to 0.768 ms and provided no
+evidence that any proposed Module 8 read index would materially improve the representative path.
+
+**Final index decision:** do **not** create
+`20260907194500_module_8_recruiter_dashboard_read_indexes.sql`. The migration head remains the Module 7
+head `20260907170000_module_7_call_results.sql`.
+
+### Final authority and blast-radius result
+
+The final diff/scope audit confirmed:
+
+```text
+Existing Modules 0–7 business authority changed:       NO
+Existing production write path changed:                 NO
+Dashboard provider call added:                          NO
+Dashboard worker/work-item side effect added:           NO
+Dashboard business-state table added:                   NO
+Dashboard mutation endpoint added:                      NO
+Current Job used to rewrite historical screening:       NO
+Current questions used to remap historical answers:     NO
+Module 6 UNKNOWN rewritten by Module 7 result truth:    NO
+MACHINE/UNKNOWN-human result exposed as Candidate answer:NO
+Candidate origin introduced as a downstream branch:     NO
+Frontend STEP 3 implementation started:                 NO
+Module 8 migration added:                               NO
+```
+
+The backend dashboard remains a read/composition layer over the frozen Modules 0–7 authorities.
+
+```text
+STEP 2 STATUS: COMPLETE / QUALIFIED / FROZEN
+
+STEP 3 DECISION: GO
+```
+
+---
+
+## 21. STEP 3 implementation and cross-verification checkpoint
+
+STEP 3 was implemented only after STEP 2 was recorded as complete, qualified, and frozen. The
+frozen Modules 0–7 authorities and the three qualified Module 8 dashboard GET contracts remain
+unchanged.
+
+### Recruiter frontend implemented
+
+The recruiter experience now includes:
+
+```text
+/                         -> authoritative recruiter dashboard
+/screenings               -> server-paginated screening workspace
+/screenings/{executionId} -> recruiter-safe historical screening detail
+```
+
+Recruiter navigation is now:
+
+```text
+Dashboard / Jobs / Candidates / Outreach / Screenings
+```
+
+Dashboard metrics, Needs Attention, recent screenings, screening filters, pagination, historical
+screening detail, and answer rendering consume the qualified Module 8 read APIs. The frontend does
+not calculate global totals from local arrays and does not recreate result-first screening-state
+logic.
+
+Shared frontend presentation contracts live under `apps/web/lib/dashboard/` and
+`apps/web/components/dashboard/`. The same screening-state badge/labels, submission labels,
+unresolved-state helper, and answer-state renderer are reused by Dashboard, Screenings, Screening
+Detail, and the recruiter-facing Outreach result view.
+
+### Bounded Outreach read-contract extension
+
+Repository tracing proved that the existing Module 5 `OutreachRequestResponse` exposed Candidate
+identity and Module 5 readiness but did not contain enough information to render historical Job/role
+or the most advanced execution/result display state without frontend guessing or N+1 requests.
+
+The smallest read-only extension was therefore added to the existing Outreach response:
+
+```text
+job_id
+job_title
+job_definition_version
+execution_id
+screening_state
+submission_status
+```
+
+The historical Job projection is bound through the exact existing authority chain:
+
+```text
+outreach request
+  -> job_candidate
+  -> outreach.decision_match_id
+  -> job_candidate_match
+  -> immutable (job_id, definition_version)
+  -> job_definition_versions
+```
+
+`screening_state` reuses the already-qualified `dashboard_screening_state_expression()`; it is not a
+new Module 5 state. Module 5 readiness, Module 6 submission status, and Module 7 terminal result truth
+remain independent and unchanged.
+
+No new Outreach mutation, worker, provider call, work item, table, migration, Job authority, result
+authority, or Candidate-origin branch was added.
+
+### Outreach UX convergence
+
+Recruiter-facing Outreach cards now display:
+
+```text
+Candidate
+historical Job / role
+most advanced authoritative execution/result display state
+```
+
+The display precedence is result-first through the same Module 8 projection while preserving the
+underlying Module 6 submission status. `READY_FOR_EXECUTION` remains Module 5 readiness and is not
+mutated to model call progress.
+
+Outreach detail keeps Candidate & Role separate from voice execution controls. Recruiter-safe call
+status and screening responses consume the same Module 8 screening detail contract used by
+`/screenings/{executionId}`. Provider reconciliation actions and provider-result rendering were
+removed from the recruiter result surface; no raw provider payload, provider identifier, recording
+URL, phone/email, or work-item internals are rendered there.
+
+Local query polling/invalidation allows cards and detail to converge after execution/result changes
+without a browser reload. Polling remains against the application API only; no frontend provider
+polling exists.
+
+### Cross-verification corrections made before patch generation
+
+The final audit identified and corrected contract-shape gaps without changing business authority:
+
+- Recent Voice Screenings now display Candidate, Role, screening state, outcome, interest, and the
+  backend-provided `sort_at` activity time.
+- `/screenings` rows now display Candidate, Role, state, outcome, interest, duration, and observed
+  time while preserving server pagination/filtering.
+- Screening detail now includes lifecycle and explicit recording-availability presentation in the
+  recruiter-safe status block.
+- `/screenings` wraps the `useSearchParams()` client workspace in a Suspense boundary for safe Next
+  App Router build behavior.
+- attention copy uses the shared recruiter label `Submission uncertain` rather than separately
+  humanizing the enum.
+- screening-state select options use the same shared state-label map as badges and Outreach.
+- the PostgreSQL query-plan qualification now runs `ANALYZE` inside the test after fixture seeding,
+  eliminating dependence on a manual pre-test statistics refresh.
+- disposable PostgreSQL Outreach qualification now proves current Job mutation cannot rewrite the
+  historical Outreach role and that `UNKNOWN + result_available` preserves Module 5 readiness and
+  Module 6 submission truth.
+- Module 8 structural validation now covers the STEP 3 frontend surface, navigation, shared status
+  semantics, absence of a capped Job dropdown, provider isolation, unsafe-field boundaries, and
+  removal of recruiter-facing Module-number copy.
+
+### Executed build-environment validation after the final audit
+
+```text
+validators 0–8:                         PASS
+Module 0 source files checked:          266
+focused Outreach + Dashboard backend:   32 passed / 8 skipped / 0 failed
+full backend regression:                324 passed / 55 skipped / 0 failed
+Python compileall:                       PASS
+changed TypeScript/TSX syntax:           25 files / 0 syntax errors
+```
+
+The eight focused skips are disposable PostgreSQL gates unavailable in this build environment. One
+of those is the new STEP 3 Outreach read-projection database qualification. The full-suite skips are
+pre-existing disposable-PostgreSQL and optional `phonenumbers` environment gates plus that new
+Outreach database gate.
+
+### Target-environment gates still required for final Module 8 product freeze
+
+The build environment does not contain a complete installable frontend dependency tree and registry
+DNS is unavailable, so the following cannot be truthfully marked PASS here:
+
+```text
+Ruff / mypy after STEP 3 bounded backend read changes
+frontend lint
+frontend typecheck
+frontend Vitest suite
+frontend Next build
+disposable PostgreSQL run including the new Outreach projection test
+Task 1 manual-Candidate hosted E2E
+Task 2 Apollo-Candidate hosted E2E
+historical Job mutation hosted E2E
+MACHINE/voicemail hosted negative E2E
+UNKNOWN/result hosted convergence qualification
+```
+
+The STEP 3 implementation patch may be qualified in the target environment, but Module 8 must not be
+recorded as fully hosted/E2E frozen until those gates pass.
+
+### STEP 3 authority/blast-radius result
+
+```text
+Dashboard became business authority:                    NO
+Outreach readiness rewritten for execution/result:      NO
+Module 6 execution truth rewritten:                     NO
+Module 7 result truth duplicated:                       NO
+Candidate origin introduced as downstream branch:       NO
+Historical Job/questions replaced by current values:    NO
+Frontend N+1 screening composition introduced:          NO
+New provider/work-item behavior introduced:             NO
+New business-state table or migration introduced:       NO
+```
+
+**STEP 3 IMPLEMENTATION STATUS: COMPLETE / CROSS-VERIFIED**
+
+**FINAL MODULE 8 HOSTED/E2E FREEZE: PENDING TARGET-ENVIRONMENT QUALIFICATION**
