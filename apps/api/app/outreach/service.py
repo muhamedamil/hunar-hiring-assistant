@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.candidates.service import CandidateService
 from app.core.errors import AppError
+from app.dashboard.repository import DashboardRepository
+from app.dashboard.schemas import DashboardScreeningState
 from app.jobs.domain import assert_unique_screening_question_keys
 from app.jobs.service import JobService
 from app.matching.schemas import DownstreamOutreachShortlist
@@ -36,6 +38,7 @@ from app.outreach.schemas import (
     OutreachScreeningQuestionDraft,
     drafts_from_job_questions,
 )
+from app.voice_calls.schemas import VoiceCallExecutionStatus
 
 _EXACT_CONTEXT_CONSTRAINT = "uq_outreach_requests_exact_context"
 
@@ -78,9 +81,16 @@ def mask_phone(phone_e164: str) -> str:
 class OutreachService:
     """Freeze HR-confirmed outreach context and derive readiness from upstream truth."""
 
-    def __init__(self, session: Session, *, repository: OutreachRepository | None = None) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        repository: OutreachRepository | None = None,
+        dashboard_repository: DashboardRepository | None = None,
+    ) -> None:
         self._session = session
         self._repository = repository or OutreachRepository()
+        self._dashboard_repository = dashboard_repository or DashboardRepository()
 
     def get_preparation(self, job_candidate_id: UUID) -> OutreachPreparationResponse:
         """Build a non-persisting preparation view from current locked authorities."""
@@ -311,10 +321,30 @@ class OutreachService:
         self, request: OutreachRequest, *, stale_reasons: list[str]
     ) -> OutreachRequestResponse:
         candidate_name, candidate_location = self._candidate_display(request.job_candidate_id)
+        projection = self._dashboard_repository.get_outreach_projection(self._session, request.id)
+        if projection is None:
+            raise OutreachStateError(
+                code="OUTREACH_HISTORICAL_CONTEXT_INVALID",
+                message="Outreach historical Job context is inconsistent.",
+            )
         return OutreachRequestResponse(
             id=request.id,
             job_candidate_id=request.job_candidate_id,
             decision_match_id=request.decision_match_id,
+            job_id=projection.job_id,
+            job_title=projection.job_title,
+            job_definition_version=projection.job_definition_version,
+            execution_id=projection.execution_id,
+            screening_state=(
+                DashboardScreeningState(projection.screening_state)
+                if projection.screening_state is not None
+                else None
+            ),
+            submission_status=(
+                VoiceCallExecutionStatus(projection.submission_status)
+                if projection.submission_status is not None
+                else None
+            ),
             candidate_name=candidate_name,
             candidate_location=candidate_location,
             masked_phone=mask_phone(request.phone_e164_snapshot),

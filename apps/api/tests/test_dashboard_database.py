@@ -488,6 +488,17 @@ def test_query_plan_is_executed_and_no_speculative_dashboard_index_exists(
         dashboard_sort_at_expression().desc(), VoiceCallExecution.id.desc()
     ).limit(20)
     compiled = statement.compile(engine, compile_kwargs={"literal_binds": True})
+    with engine.begin() as connection:
+        for table_name in (
+            "voice_call_executions",
+            "outreach_requests",
+            "job_candidates",
+            "candidates",
+            "job_candidate_matches",
+            "job_definition_versions",
+            "voice_call_results",
+        ):
+            connection.execute(text(f"ANALYZE public.{table_name}"))
     with engine.connect() as connection:
         plan_rows = connection.execute(
             text("EXPLAIN (ANALYZE, BUFFERS) " + str(compiled))

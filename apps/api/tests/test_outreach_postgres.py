@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import sessionmaker
 
+from app.call_results.models import VoiceCallResult
 from app.candidates.schemas import CandidateCreateRequest
 from app.candidates.service import CandidateService
 from app.jobs.schemas import JobCreateRequest, JobDefinitionEdit, ScreeningQuestionCreate
@@ -17,6 +20,7 @@ from app.jobs.service import JobService
 from app.matching.schemas import ShortlistStatus
 from app.matching.service import MatchingService
 from app.outreach.service import OutreachService
+from app.voice_calls.models import VoiceCallExecution
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -172,3 +176,76 @@ def test_concurrent_identical_confirm_creates_one_authoritative_row(session_fact
         assert (
             session.execute(text("select count(*) from public.outreach_requests")).scalar_one() == 1
         )
+
+
+def test_outreach_read_projection_uses_historical_job_and_result_first_state(
+    session_factory,
+) -> None:
+    """Outreach UX reads historical Job context and Module 8 state without rewriting readiness."""
+
+    relation_id = _create_shortlisted_context(session_factory)
+    request = _confirm(session_factory, relation_id)
+    execution_id = None
+    with session_factory.begin() as session:
+        row = session.execute(
+            text(
+                "select j.id as job_id from public.outreach_requests o "
+                "join public.job_candidates jc on jc.id=o.job_candidate_id "
+                "join public.jobs j on j.id=jc.job_id where o.id=:id"
+            ),
+            {"id": request.id},
+        ).one()
+        session.execute(
+            text("update public.jobs set title='CURRENT MUTATED TITLE' where id=:job_id"),
+            {"job_id": row.job_id},
+        )
+        execution = VoiceCallExecution(
+            id=uuid4(),
+            outreach_request_id=request.id,
+            agent_id=uuid4(),
+            provider_call_id=None,
+            provider_request_id="hha-outreach-read-projection",
+            status="unknown",
+            language="ENGLISH",
+            timezone="Asia/Kolkata",
+            agent_contract_version="hunar_voice_screening_en_v1",
+            provider_initial_status=None,
+            provider_payload_snapshot={},
+            submitted_at=None,
+        )
+        session.add(execution)
+        session.flush()
+        execution_id = execution.id
+        now = datetime.now(UTC)
+        session.add(
+            VoiceCallResult(
+                id=uuid4(),
+                voice_call_execution_id=execution.id,
+                provider_call_id=uuid4(),
+                provider_status="COMPLETED",
+                lifecycle_status="COMPLETED",
+                answered_by="HUMAN",
+                screening_result_state="available",
+                result_failure_code=None,
+                conversation_outcome="completed",
+                candidate_interest="interested",
+                notes="Projection qualification",
+                duration_seconds=30.0,
+                started_at=now,
+                ended_at=now,
+                recording_url="https://provider.invalid/private",
+                observed_at=now,
+                updated_at=now,
+            )
+        )
+
+    with session_factory() as session:
+        projected = OutreachService(session).get_outreach_request(request.id)
+
+    assert execution_id is not None
+    assert projected.readiness == "READY_FOR_EXECUTION"
+    assert projected.job_title == "Backend Engineer"
+    assert projected.job_definition_version == 1
+    assert projected.execution_id == execution_id
+    assert projected.screening_state == "result_available"
+    assert projected.submission_status == "unknown"

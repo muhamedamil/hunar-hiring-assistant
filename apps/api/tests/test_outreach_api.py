@@ -32,6 +32,12 @@ class FakeOutreachService:
             id=self.request_id,
             job_candidate_id=self.relation_id,
             decision_match_id=self.match_id,
+            job_id=self.job_id,
+            job_title="Backend Engineer",
+            job_definition_version=2,
+            execution_id=None,
+            screening_state=None,
+            submission_status=None,
             candidate_name="Aisha Khan",
             candidate_location="Bengaluru",
             masked_phone="+91••••••3210",
@@ -123,6 +129,8 @@ def test_module_5_routes_expose_masked_phone_only(client_and_service) -> None:
     assert listed.status_code == 200
     assert listed.json()["items"][0]["candidate_name"] == "Aisha Khan"
     assert listed.json()["items"][0]["candidate_location"] == "Bengaluru"
+    assert listed.json()["items"][0]["job_title"] == "Backend Engineer"
+    assert listed.json()["items"][0]["screening_state"] is None
 
 
 def test_browser_cannot_choose_authoritative_outreach_values(client_and_service) -> None:

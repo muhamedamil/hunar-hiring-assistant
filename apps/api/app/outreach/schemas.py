@@ -9,7 +9,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.dashboard.schemas import DashboardScreeningState
 from app.jobs.schemas import ScreeningQuestion, ScreeningQuestionCreate
+from app.voice_calls.schemas import VoiceCallExecutionStatus
 
 OUTREACH_ACTION: Final[Literal["Voice screening outreach"]] = "Voice screening outreach"
 
@@ -66,6 +68,12 @@ class OutreachRequestResponse(BaseModel):
     id: UUID
     job_candidate_id: UUID
     decision_match_id: UUID
+    job_id: UUID
+    job_title: str
+    job_definition_version: int = Field(ge=1)
+    execution_id: UUID | None = None
+    screening_state: DashboardScreeningState | None = None
+    submission_status: VoiceCallExecutionStatus | None = None
     candidate_name: str
     candidate_location: str | None
     masked_phone: str

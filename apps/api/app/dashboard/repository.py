@@ -70,6 +70,18 @@ class DashboardScreeningAnswerRecord:
 
 
 @dataclass(frozen=True)
+class DashboardOutreachProjectionRecord:
+    """Historical Job context plus optional execution/result display state for Outreach UX."""
+
+    job_id: UUID
+    job_title: str
+    job_definition_version: int
+    execution_id: UUID | None
+    screening_state: str | None
+    submission_status: str | None
+
+
+@dataclass(frozen=True)
 class DashboardAttentionRecord:
     """Internal attention row projected from an existing authoritative owner."""
 
@@ -354,6 +366,60 @@ class DashboardRepository:
                 "Voice execution exists but required immutable historical context is missing"
             )
         return self._mapping_to_context_record(row)
+
+    def get_outreach_projection(
+        self,
+        session: Session,
+        outreach_request_id: UUID,
+    ) -> DashboardOutreachProjectionRecord | None:
+        """Return exact historical Job context and optional canonical screening state."""
+
+        state = dashboard_screening_state_expression()
+        statement = (
+            select(
+                JobCandidateMatch.job_id.label("job_id"),
+                JobDefinitionVersion.title.label("job_title"),
+                JobCandidateMatch.definition_version.label("job_definition_version"),
+                VoiceCallExecution.id.label("execution_id"),
+                state.label("screening_state"),
+                VoiceCallExecution.status.label("submission_status"),
+            )
+            .select_from(OutreachRequest)
+            .join(JobCandidate, JobCandidate.id == OutreachRequest.job_candidate_id)
+            .join(
+                JobCandidateMatch,
+                (JobCandidateMatch.id == OutreachRequest.decision_match_id)
+                & (JobCandidateMatch.job_candidate_id == OutreachRequest.job_candidate_id)
+                & (JobCandidateMatch.job_id == JobCandidate.job_id)
+                & (JobCandidateMatch.candidate_id == JobCandidate.candidate_id),
+            )
+            .join(
+                JobDefinitionVersion,
+                (JobDefinitionVersion.job_id == JobCandidateMatch.job_id)
+                & (JobDefinitionVersion.version == JobCandidateMatch.definition_version),
+            )
+            .outerjoin(
+                VoiceCallExecution,
+                VoiceCallExecution.outreach_request_id == OutreachRequest.id,
+            )
+            .outerjoin(
+                VoiceCallResult,
+                VoiceCallResult.voice_call_execution_id == VoiceCallExecution.id,
+            )
+            .where(OutreachRequest.id == outreach_request_id)
+        )
+        row = session.execute(statement).mappings().one_or_none()
+        if row is None:
+            return None
+        has_execution = row.execution_id is not None
+        return DashboardOutreachProjectionRecord(
+            job_id=row.job_id,
+            job_title=row.job_title,
+            job_definition_version=row.job_definition_version,
+            execution_id=row.execution_id,
+            screening_state=str(row.screening_state) if has_execution else None,
+            submission_status=str(row.submission_status) if has_execution else None,
+        )
 
     def list_screening_answers(
         self,

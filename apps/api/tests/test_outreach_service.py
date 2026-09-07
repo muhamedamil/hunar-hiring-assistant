@@ -27,6 +27,26 @@ class FakeSession:
         pass
 
 
+
+
+class FakeDashboardRepository:
+    def __init__(self, shortlist) -> None:
+        self.shortlist = shortlist
+        self.execution_id = None
+        self.screening_state = None
+        self.submission_status = None
+
+    def get_outreach_projection(self, _session, _request_id):
+        return SimpleNamespace(
+            job_id=self.shortlist.job_id,
+            job_title="Backend Engineer",
+            job_definition_version=self.shortlist.definition_version,
+            execution_id=self.execution_id,
+            screening_state=self.screening_state,
+            submission_status=self.submission_status,
+        )
+
+
 class FakeRepository:
     def __init__(self) -> None:
         self.rows: list[OutreachRequest] = []
@@ -89,7 +109,12 @@ def context(monkeypatch):
 
     monkeypatch.setattr("app.outreach.service.JobService", FakeJobService)
     repository = FakeRepository()
-    service = OutreachService(FakeSession(), repository=repository)
+    dashboard_repository = FakeDashboardRepository(shortlist)
+    service = OutreachService(
+        FakeSession(),
+        repository=repository,
+        dashboard_repository=dashboard_repository,
+    )
     state = {"shortlist": shortlist, "phone": "+919876543210"}
     monkeypatch.setattr(
         service,
@@ -107,6 +132,7 @@ def context(monkeypatch):
         state=state,
         shortlist=shortlist,
         source_id=source_id,
+        dashboard_repository=dashboard_repository,
     )
 
 
@@ -245,3 +271,18 @@ def test_dispatch_snapshot_uses_exact_frozen_values(context, monkeypatch) -> Non
     assert snapshot.phone_e164 == "+919876543210"
     assert snapshot.screening_questions == confirmed.screening_questions
     assert snapshot.decision_match_id == context.shortlist.decision_match_id
+
+
+def test_outreach_read_projection_keeps_readiness_and_execution_state_separate(context) -> None:
+    confirmed = confirmation(context)
+    context.dashboard_repository.execution_id = uuid4()
+    context.dashboard_repository.screening_state = "result_available"
+    context.dashboard_repository.submission_status = "unknown"
+
+    projected = context.service.get_outreach_request(confirmed.id)
+
+    assert projected.readiness == "READY_FOR_EXECUTION"
+    assert projected.job_title == "Backend Engineer"
+    assert projected.job_definition_version == 2
+    assert projected.screening_state == "result_available"
+    assert projected.submission_status == "unknown"
