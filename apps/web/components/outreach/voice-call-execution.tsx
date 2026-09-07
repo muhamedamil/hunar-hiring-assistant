@@ -5,8 +5,10 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VoiceCallResultPanel } from "@/components/outreach/voice-call-result";
 import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import type { OutreachQuestion } from "@/lib/outreach/types";
 import type { VoiceCallExecution, VoiceScreeningOptions } from "@/lib/voice-calls/types";
 
 const labels: Record<VoiceCallExecution["status"], string> = {
@@ -16,8 +18,8 @@ const labels: Record<VoiceCallExecution["status"], string> = {
   unknown: "Call submission outcome is uncertain.",
 };
 
-export function VoiceCallExecutionPanel({ outreachRequestId, ready }: {
-  outreachRequestId: string; ready: boolean;
+export function VoiceCallExecutionPanel({ outreachRequestId, ready, questions = [] }: {
+  outreachRequestId: string; ready: boolean; questions?: OutreachQuestion[];
 }) {
   const client = useQueryClient();
   const key = ["voice-call", outreachRequestId];
@@ -57,6 +59,7 @@ export function VoiceCallExecutionPanel({ outreachRequestId, ready }: {
         {row.status === "submitted" ? <p>Provider acceptance confirmed. This does not mean the call is complete.</p> : null}
         {row.status === "unknown" ? <p>Submission needs investigation before another call can be attempted.</p> : null}
         {row.status === "failed" && ready ? <Button disabled={dispatch.isPending} onClick={() => dispatch.mutate()}>Retry dispatch</Button> : null}
+        <VoiceCallResultPanel execution={row} questions={questions} />
       </> : !execution.isPending && !execution.isError && ready ? <>
         {options.isError ? <p role="alert">Unable to load voice screening options.</p> : null}
         {options.data?.languages.length === 0 ? <p>Voice screening is not configured yet.</p> : null}

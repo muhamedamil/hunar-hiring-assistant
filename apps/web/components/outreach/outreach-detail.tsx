@@ -46,7 +46,7 @@ export function OutreachDetail({ outreachRequestId }: { outreachRequestId: strin
           <div><p className="text-slate-500">Screening context</p><p className="font-medium">{request.screening_questions.length} questions</p></div>
         </CardContent>
       </Card>
-      <VoiceCallExecutionPanel outreachRequestId={outreachRequestId} ready={request.readiness === "READY_FOR_EXECUTION"} />
+      <VoiceCallExecutionPanel outreachRequestId={outreachRequestId} ready={request.readiness === "READY_FOR_EXECUTION"} questions={request.screening_questions} />
       <Card>
         <CardHeader><CardTitle>Confirmed screening questions</CardTitle></CardHeader>
         <CardContent><ScreeningQuestionEditor value={questions} onChange={() => undefined} disabled /></CardContent>
