@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
+import { VoiceCallExecutionPanel } from "@/components/outreach/voice-call-execution";
 import { ScreeningQuestionEditor } from "@/components/jobs/screening-question-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,7 @@ export function OutreachDetail({ outreachRequestId }: { outreachRequestId: strin
           <div><p className="text-slate-500">Screening context</p><p className="font-medium">{request.screening_questions.length} questions</p></div>
         </CardContent>
       </Card>
+      <VoiceCallExecutionPanel outreachRequestId={outreachRequestId} ready={request.readiness === "READY_FOR_EXECUTION"} />
       <Card>
         <CardHeader><CardTitle>Confirmed screening questions</CardTitle></CardHeader>
         <CardContent><ScreeningQuestionEditor value={questions} onChange={() => undefined} disabled /></CardContent>
