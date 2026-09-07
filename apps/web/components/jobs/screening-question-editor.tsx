@@ -10,6 +10,7 @@ import type { ScreeningAnswerType, ScreeningQuestionInput } from "@/lib/jobs/typ
 
 interface EditableQuestion extends ScreeningQuestionInput {
   client_key: string;
+  source_job_question_id?: string | null;
 }
 
 interface ScreeningQuestionEditorProps {

@@ -127,6 +127,13 @@ export function JobCandidateDetail({ jobCandidateId }: { jobCandidateId: string 
       <Card>
         <CardHeader><CardTitle>Recruiter decision</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2">
+          {detail.shortlist_status === "shortlisted"
+            && detail.decision_is_current
+            && detail.call_readiness === "ready" ? (
+              <Button asChild>
+                <Link href={`/job-candidates/${detail.id}/outreach`}>Prepare voice outreach</Link>
+              </Button>
+            ) : null}
           <Button
             disabled={pending || !current || !detail.match_freshness.is_fresh || detail.current_job_status !== "ready"}
             onClick={() => shortlistMutation.mutate({ revision: detail.revision, status: "shortlisted" })}
