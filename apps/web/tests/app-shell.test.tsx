@@ -13,7 +13,10 @@ describe("AppShell", () => {
 
     expect(screen.getByText("Hunar Hiring Assistant")).toBeInTheDocument();
     expect(screen.getByText("content")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Jobs" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Candidates" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Outreach" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Screenings" })).toBeInTheDocument();
   });
 });

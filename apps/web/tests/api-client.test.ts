@@ -5,6 +5,7 @@ vi.mock("@/lib/env", () => ({
 }));
 
 import { api } from "@/lib/api/client";
+import { listDashboardScreenings } from "@/lib/dashboard/api";
 
 describe("api client", () => {
   beforeEach(() => {
@@ -52,6 +53,29 @@ describe("api client", () => {
       code: "DATABASE_UNAVAILABLE",
       requestId: "req-1",
     });
+  });
+
+  it("keeps job_id as a programmatic screening filter and trims q", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], total: 0, limit: 20, offset: 40 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listDashboardScreenings({
+      jobId: "job-123",
+      state: "result_available",
+      interest: "interested",
+      q: "  Aisha  ",
+      limit: 20,
+      offset: 40,
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "http://api.test/api/v1/dashboard/screenings?job_id=job-123&state=result_available&interest=interested&q=Aisha&limit=20&offset=40",
+    );
   });
 
   it("turns network failures into NETWORK_ERROR", async () => {
