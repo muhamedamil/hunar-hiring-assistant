@@ -90,11 +90,11 @@ def main() -> None:
     )
     require(
         "apps/web/components/outreach/voice-call-execution.tsx",
-        "Preparing voice call…",
-        "Call submitted to Hunar",
-        "Call could not be submitted",
-        "Call submission outcome is uncertain.",
+        "submissionStatusLabels",
+        "Submission certainty remains unknown.",
         'row.status === "failed"',
+        "Retry dispatch",
+        "Start voice screening",
     )
     require(
         "apps/api/app/main.py",

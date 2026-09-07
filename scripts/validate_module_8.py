@@ -39,6 +39,19 @@ def main() -> None:
         "doc/MODULE_8_IMPLEMENTATION_LEDGER.md",
         "doc/MODULE_8_IMPLEMENTATION_PLAN.md",
         "doc/MODULE_8_VALIDATION.md",
+        "apps/web/lib/dashboard/api.ts",
+        "apps/web/lib/dashboard/queries.ts",
+        "apps/web/lib/dashboard/types.ts",
+        "apps/web/lib/dashboard/presentation.ts",
+        "apps/web/components/dashboard/dashboard-overview.tsx",
+        "apps/web/components/dashboard/screenings-workspace.tsx",
+        "apps/web/components/dashboard/screening-detail.tsx",
+        "apps/web/components/dashboard/screening-detail-content.tsx",
+        "apps/web/components/dashboard/screening-state-badge.tsx",
+        "apps/web/app/screenings/page.tsx",
+        "apps/web/app/screenings/[executionId]/page.tsx",
+        "apps/web/tests/dashboard.test.tsx",
+        "apps/web/tests/screenings-dashboard.test.tsx",
     ]
     missing = [path for path in required_files if not (ROOT / path).exists()]
     if missing:
@@ -170,6 +183,136 @@ def main() -> None:
         require(repository, "JobDefinitionVersion.title.label(\"job_title\")")
     if "Job.screening_questions" in dashboard_domain:
         raise AssertionError("Dashboard remaps historical screening questions from current Job")
+
+    dashboard_api = read("apps/web/lib/dashboard/api.ts")
+    presentation = read("apps/web/lib/dashboard/presentation.ts")
+    overview_ui = read("apps/web/components/dashboard/dashboard-overview.tsx")
+    screenings_ui = read("apps/web/components/dashboard/screenings-workspace.tsx")
+    screening_detail_ui = read("apps/web/components/dashboard/screening-detail-content.tsx")
+    outreach_list_ui = read("apps/web/components/outreach/outreach-list.tsx")
+    outreach_detail_ui = read("apps/web/components/outreach/outreach-detail.tsx")
+    outreach_result_ui = read("apps/web/components/outreach/voice-call-result.tsx")
+    shell = read("apps/web/components/layout/app-shell.tsx")
+    screenings_page = read("apps/web/app/screenings/page.tsx")
+
+    require(
+        dashboard_api,
+        'api.get("/dashboard/overview")',
+        'api.get(`/dashboard/screenings?${params.toString()}`)',
+        'api.get(`/dashboard/screenings/${executionId}`)',
+        'params.set("job_id", filters.jobId)',
+    )
+    for marker in ("api.post(", "api.patch(", "api.put(", "api.delete("):
+        if marker in dashboard_api:
+            raise AssertionError(f"Dashboard frontend added a mutation call: {marker}")
+
+    require(
+        presentation,
+        'submission_unknown: "Submission uncertain"',
+        'result_available: "Result available"',
+        'if (state === null) return "No authoritative answer recorded"',
+        'state === "queued" || state === "awaiting_result" || state === "submission_unknown"',
+    )
+    require(
+        overview_ui,
+        'data.screenings.result_available',
+        'data.recent_screenings.map',
+        'dateTime={row.sort_at}',
+        'humanize(row.conversation_outcome)',
+        'humanize(row.candidate_interest)',
+    )
+    require(
+        screenings_ui,
+        'const jobId = params.get("job_id") ?? undefined',
+        'listDashboardScreenings(filters)',
+        'isUnresolvedScreeningState(row.screening_state)',
+        'row.duration_seconds',
+        'row.observed_at',
+    )
+    if 'aria-label="Job"' in screenings_ui or 'All jobs' in screenings_ui:
+        raise AssertionError("Screenings UI introduced a capped/global Job dropdown")
+    require(
+        screening_detail_ui,
+        'submissionStatusLabels[detail.submission_status]',
+        '<ScreeningStateBadge state={detail.screening_state}',
+        'humanize(detail.lifecycle_status)',
+        'answerDisplay(question.answer_state, question.answer_text)',
+        'No human screening answers are available for this call.',
+        'Screening result could not be safely normalized.',
+    )
+    require(screenings_page, '<Suspense fallback=')
+
+    require(
+        outreach_list_ui,
+        'request.job_title',
+        '<ScreeningStateBadge state={request.screening_state}',
+        'Ready for execution',
+    )
+    require(
+        outreach_detail_ui,
+        'request.job_title',
+        'request.job_definition_version',
+        '<ScreeningStateBadge state={request.screening_state}',
+    )
+    require(
+        outreach_result_ui,
+        'getDashboardScreeningDetail(execution.id)',
+        '<ScreeningDetailContent detail={query.data} showIdentity={false}',
+        'invalidateQueries({ queryKey: outreachKeys.all })',
+    )
+    for marker in ("reconcileCallResult", "Refresh result from Hunar", "Check Hunar safely"):
+        if marker in outreach_result_ui:
+            raise AssertionError(f"Recruiter result UI retained provider reconciliation: {marker}")
+
+    require(
+        shell,
+        '["Dashboard", "/"]',
+        '["Jobs", "/jobs"]',
+        '["Candidates", "/candidates"]',
+        '["Outreach", "/outreach"]',
+        '["Screenings", "/screenings"]',
+    )
+
+    recruiter_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for root in (ROOT / "apps/web/app", ROOT / "apps/web/components")
+        for path in root.rglob("*.tsx")
+    )
+    for marker in (
+        "Module 1",
+        "Module 2",
+        "Module 3",
+        "Module 4",
+        "Module 5",
+        "Module 6",
+        "Module 7",
+        "future Module",
+    ):
+        if marker in recruiter_sources:
+            raise AssertionError(f"Recruiter-facing Module language remains: {marker}")
+
+    dashboard_frontend = "\n".join(
+        path.read_text(encoding="utf-8")
+        for root in (ROOT / "apps/web/lib/dashboard", ROOT / "apps/web/components/dashboard")
+        for path in root.rglob("*.ts*")
+    )
+    forbidden_frontend_dependencies = (
+        "HUNAR_API_KEY",
+        "APOLLO_API_KEY",
+        "GEMINI_API_KEY",
+        "provider_call_id",
+        "provider_request_id",
+        "recording_url",
+        "phone_e164",
+        "masked_phone",
+        "work_item",
+        "reconcile",
+    )
+    found_frontend = [
+        marker for marker in forbidden_frontend_dependencies if marker in dashboard_frontend
+    ]
+    if found_frontend:
+        raise AssertionError(f"Unsafe dashboard frontend dependency/field found: {found_frontend}")
 
     main = read("apps/api/app/main.py")
     pyproject = read("apps/api/pyproject.toml")
