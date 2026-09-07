@@ -15,6 +15,7 @@ from app.integrations.hunar.schemas import (
     HunarAgentDetail,
     HunarCallCreateCommand,
     HunarCallCreateResponse,
+    HunarCallDetail,
     HunarCallStatus,
 )
 
@@ -65,6 +66,17 @@ class HunarVoiceProvider:
         except (ValidationError, ValueError):
             call_id, initial_status = salvage_identity(raw)
             raise HunarAmbiguousResponseError(call_id, initial_status) from None
+
+    def get_call(self, call_id: UUID) -> HunarCallDetail:
+        """Fetch one known call by exact identity; this method never creates or searches calls."""
+
+        raw = self._http.request_json("GET", f"calls/{call_id}/")
+        try:
+            return HunarCallDetail.model_validate(raw)
+        except ValidationError:
+            raise ProviderInvalidResponseError(
+                code="HUNAR_CALL_RESPONSE_INVALID", message="Call response is invalid."
+            ) from None
 
 
 def salvage_identity(raw: object) -> tuple[UUID | None, HunarCallStatus | None]:

@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     hunar_default_timezone: HunarTimezone = HunarTimezone.ASIA_KOLKATA
     hunar_read_timeout_seconds: float = Field(default=30, gt=0, le=120)
     hunar_call_summary_callback_url: str | None = None
+    hunar_webhook_api_keys_json: str = Field(default="[]", repr=False)
 
     @field_validator("hunar_screening_agent_ids_json")
     @classmethod
@@ -74,6 +75,25 @@ class Settings(BaseSettings):
             HunarLanguage(k): UUID(v)
             for k, v in json.loads(self.hunar_screening_agent_ids_json).items()
         }
+
+    @field_validator("hunar_webhook_api_keys_json")
+    @classmethod
+    def validate_hunar_webhook_keys(cls, value: str) -> str:
+        """Require a JSON list of non-empty signing keys without exposing their values."""
+
+        keys = TypeAdapter(list[str]).validate_json(value)
+        if any(not key.strip() for key in keys):
+            raise ValueError("Hunar webhook keys cannot be blank")
+        return value
+
+    @property
+    def hunar_webhook_api_keys(self) -> tuple[str, ...]:
+        """Use explicit rotation keys, falling back to the configured API key."""
+
+        explicit = tuple(key.strip() for key in json.loads(self.hunar_webhook_api_keys_json))
+        if explicit:
+            return explicit
+        return (self.hunar_api_key,) if self.hunar_api_key else ()
 
     @field_validator("hunar_api_base_url", "hunar_call_summary_callback_url")
     @classmethod

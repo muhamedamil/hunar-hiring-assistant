@@ -35,6 +35,28 @@ class VoiceCallRepository:
             select(VoiceCallExecution).where(VoiceCallExecution.outreach_request_id == outreach_id)
         ).scalar_one_or_none()
 
+    def get_by_provider_request_id(
+        self, session: Session, provider_request_id: str
+    ) -> VoiceCallExecution | None:
+        """Resolve exact immutable request correlation evidence."""
+
+        return session.execute(
+            select(VoiceCallExecution).where(
+                VoiceCallExecution.provider_request_id == provider_request_id
+            )
+        ).scalar_one_or_none()
+
+    def get_by_provider_call_id(
+        self, session: Session, provider_call_id: UUID
+    ) -> VoiceCallExecution | None:
+        """Resolve a provider call identity already observed by Module 6."""
+
+        return session.execute(
+            select(VoiceCallExecution).where(
+                VoiceCallExecution.provider_call_id == provider_call_id
+            )
+        ).scalar_one_or_none()
+
     def insert_execution(
         self, session: Session, row: VoiceCallExecution
     ) -> tuple[VoiceCallExecution, bool]:

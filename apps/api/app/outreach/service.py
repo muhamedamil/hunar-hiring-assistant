@@ -31,6 +31,7 @@ from app.outreach.schemas import (
     OutreachReadiness,
     OutreachRequestListResponse,
     OutreachRequestResponse,
+    OutreachResultContext,
     OutreachScreeningQuestion,
     OutreachScreeningQuestionDraft,
     drafts_from_job_questions,
@@ -217,6 +218,17 @@ class OutreachService:
             if request is None:
                 raise OutreachNotFoundError()
             return self._to_response(request, stale_reasons=self._current_stale_reasons(request))
+
+    def get_result_context(self, outreach_request_id: UUID) -> OutreachResultContext:
+        """Read exact frozen questions without consulting any current upstream authority."""
+
+        request = self._repository.get(self._session, outreach_request_id)
+        if request is None:
+            raise OutreachNotFoundError()
+        return OutreachResultContext(
+            outreach_request_id=request.id,
+            screening_questions=self._parse_questions(request),
+        )
 
     def list_outreach_requests(self, *, limit: int, offset: int) -> OutreachRequestListResponse:
         """List immutable requests and derive readiness independently for each row."""

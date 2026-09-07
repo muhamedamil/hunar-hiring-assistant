@@ -31,7 +31,11 @@ from app.voice_calls.agent_contract import AgentContract, get_contract
 from app.voice_calls.errors import VoiceCallError
 from app.voice_calls.models import VoiceCallExecution
 from app.voice_calls.repository import VoiceCallRepository
-from app.voice_calls.schemas import VoiceCallExecutionResponse, VoiceScreeningOptionsResponse
+from app.voice_calls.schemas import (
+    VoiceCallExecutionResponse,
+    VoiceCallResultBinding,
+    VoiceScreeningOptionsResponse,
+)
 from app.work_items.repository import WorkItemRepository
 from app.work_items.schemas import WorkItemCreate
 from app.work_items.service import WorkItemService
@@ -207,6 +211,31 @@ class VoiceCallService:
             row = self._repository.get_for_outreach(self._session, outreach_request_id)
             return VoiceCallExecutionResponse.model_validate(row) if row is not None else None
 
+    def get_result_binding(self, execution_id: UUID) -> VoiceCallResultBinding:
+        """Return immutable result correlation inputs without current outreach validation."""
+
+        return self._to_result_binding(self._require(execution_id))
+
+    def resolve_result_binding(
+        self, *, provider_call_id: UUID | None, provider_request_id: str
+    ) -> VoiceCallResultBinding:
+        """Resolve exact request/call evidence and fail closed when identities disagree."""
+
+        by_request = self._repository.get_by_provider_request_id(self._session, provider_request_id)
+        by_call = (
+            self._repository.get_by_provider_call_id(self._session, provider_call_id)
+            if provider_call_id is not None
+            else None
+        )
+        if by_request is None or (by_call is not None and by_call.id != by_request.id):
+            raise VoiceCallError("HUNAR_EXECUTION_CORRELATION_CONFLICT")
+        if (
+            by_request.provider_call_id is not None
+            and by_request.provider_call_id != provider_call_id
+        ):
+            raise VoiceCallError("HUNAR_EXECUTION_CORRELATION_CONFLICT")
+        return self._to_result_binding(by_request)
+
     def retry_failed_execution(self, execution_id: UUID) -> VoiceCallExecutionResponse:
         """FAILED only; preflight between two short transactions, reuse exact frozen payload."""
         with self._session.begin():
@@ -246,3 +275,23 @@ class VoiceCallService:
         if row is None:
             raise VoiceCallError("VOICE_CALL_NOT_FOUND", 404)
         return row
+
+    @staticmethod
+    def _to_result_binding(row: VoiceCallExecution) -> VoiceCallResultBinding:
+        """Project the only Module 6 payload field Module 7 may consume."""
+
+        command = HunarCallCreateCommand.model_validate(row.provider_payload_snapshot)
+        return VoiceCallResultBinding.model_validate(
+            {
+                "execution_id": row.id,
+                "outreach_request_id": row.outreach_request_id,
+                "execution_status": row.status,
+                "agent_id": row.agent_id,
+                "language": row.language,
+                "timezone": row.timezone,
+                "agent_contract_version": row.agent_contract_version,
+                "provider_request_id": row.provider_request_id,
+                "provider_call_id": row.provider_call_id,
+                "expected_mobile_number": command.mobile_number,
+            }
+        )

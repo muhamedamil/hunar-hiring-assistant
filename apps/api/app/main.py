@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.call_results.router import router as call_results_router
 from app.candidates.router import router as candidates_router
 from app.core.config import get_settings
 from app.core.database import check_database_connection
@@ -26,7 +27,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Hunar Hiring Assistant API",
-        version="0.7.0",
+        version="0.8.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(matching_router)
     app.include_router(outreach_router)
     app.include_router(voice_calls_router)
+    app.include_router(call_results_router)
 
     @app.get("/api/v1/health/live", tags=["health"])
     def live() -> dict[str, str]:

@@ -53,3 +53,19 @@ class VoiceCallExecutionResponse(BaseModel):
     submitted_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class VoiceCallResultBinding(BaseModel):
+    """Internal immutable execution identity exposed narrowly to Module 7."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    execution_id: UUID
+    outreach_request_id: UUID
+    execution_status: VoiceCallExecutionStatus
+    agent_id: UUID
+    language: HunarLanguage
+    timezone: HunarTimezone
+    agent_contract_version: str
+    provider_request_id: str
+    provider_call_id: UUID | None
+    expected_mobile_number: str

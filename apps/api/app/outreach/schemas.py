@@ -100,6 +100,14 @@ class OutreachDispatchSnapshot(BaseModel):
     screening_questions: list[OutreachScreeningQuestion]
 
 
+class OutreachResultContext(BaseModel):
+    """Narrow historical question context independent of current upstream readiness."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    outreach_request_id: UUID
+    screening_questions: list[OutreachScreeningQuestion]
+
+
 def drafts_from_job_questions(
     questions: list[ScreeningQuestion],
 ) -> list[OutreachScreeningQuestionDraft]:

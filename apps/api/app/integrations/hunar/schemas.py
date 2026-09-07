@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Literal, Self
 from urllib.parse import urlsplit
@@ -97,6 +98,25 @@ class HunarCallStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class HunarLifecycleStatus(StrEnum):
+    """Provider lifecycle values; Module 7 persists terminal members only."""
+
+    NOT_STARTED = "NOT_STARTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    NOT_CONNECTED = "NOT_CONNECTED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class HunarAnsweredBy(StrEnum):
+    """Provider classification used to fail closed before accepting screening answers."""
+
+    HUMAN = "HUMAN"
+    MACHINE = "MACHINE"
+    UNKNOWN = "UNKNOWN"
+
+
 class HunarAgentDetail(BaseModel):
     """Required preflight evidence; unrelated provider display fields are ignored."""
 
@@ -169,3 +189,50 @@ class HunarCallCreateResponse(BaseModel):
     callee_name: StrictStr
     mobile_number: StrictStr
     timezone: HunarTimezone
+
+
+class HunarCallSummaryWebhook(BaseModel):
+    """Authenticated call-summary fields used by Module 7; unrelated fields are ignored."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
+    event_type: Literal["call_summary"]
+    call_id: UUID
+    agent_id: UUID
+    request_id: StrictStr = Field(min_length=1, max_length=64)
+    to_number: StrictStr = Field(pattern=r"^\+[1-9][0-9]{7,14}$")
+    status: HunarCallStatus
+    lifecycle_status: HunarLifecycleStatus
+    answered_by: HunarAnsweredBy | None = None
+    max_retries: int
+    retry_count: int
+    retries_left: int
+    next_retry_scheduled_at: datetime | None = None
+    duration_seconds: float | None = Field(default=None, ge=0)
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    timezone: HunarTimezone
+    recording_url: StrictStr | None = None
+    result: dict[str, object] | None = None
+
+
+class HunarCallDetail(BaseModel):
+    """Read-only detailed-call evidence normalized without persisting its raw response."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
+    id: UUID
+    agent_id: UUID
+    request_id: StrictStr = Field(min_length=1, max_length=64)
+    mobile_number: StrictStr = Field(pattern=r"^\+[1-9][0-9]{7,14}$")
+    status: HunarCallStatus
+    lifecycle_status: HunarLifecycleStatus
+    answered_by: HunarAnsweredBy | None = None
+    max_retries: int
+    retry_count: int
+    retries_left: int
+    next_retry_scheduled_at: datetime | None = None
+    duration_seconds: float | None = Field(default=None, ge=0)
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    recording_url: StrictStr | None = None
+    result: dict[str, object] | None = None
+    timezone: HunarTimezone | None = None
