@@ -255,3 +255,15 @@ class MatchHistoryResponse(BaseModel):
     items: list[MatchEvaluationResponse]
     limit: int
     offset: int
+
+
+class DownstreamOutreachShortlist(BaseModel):
+    """Current shortlist identity/version authority exposed to Module 5."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_candidate_id: UUID
+    job_id: UUID
+    candidate_id: UUID
+    decision_match_id: UUID
+    definition_version: int = Field(ge=1)

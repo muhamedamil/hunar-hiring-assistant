@@ -139,6 +139,15 @@ class CandidateMatchingSnapshot(BaseModel):
     has_phone: bool
 
 
+class CandidateOutreachContactSnapshot(BaseModel):
+    """Canonical Candidate identity/contact allowed for immutable outreach binding."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: UUID
+    phone_e164: str | None
+
+
 class ExternalCandidateObservation(BaseModel):
     """Provider-neutral person observation consumed internally by future sourcing modules."""
 

@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
+from app.jobs.domain import assert_unique_screening_question_keys
 from app.jobs.errors import (
     JobAlreadyDraftError,
     JobAlreadyReadyError,
@@ -45,7 +46,7 @@ class JobService:
     def create_draft(self, command: JobCreateRequest) -> JobResponse:
         """Create a new DRAFT Job with server-owned screening-question identities."""
 
-        self._assert_unique_question_keys(command.screening_questions)
+        assert_unique_screening_question_keys(command.screening_questions)
         questions = self._materialize_new_questions(command.screening_questions)
         now = datetime.now(UTC)
         job = Job(
@@ -107,7 +108,7 @@ class JobService:
             if JobStatus(job.status) is not JobStatus.DRAFT:
                 raise JobNotEditableError()
 
-            self._assert_unique_question_keys(definition.screening_questions)
+            assert_unique_screening_question_keys(definition.screening_questions)
             questions = self._reconcile_questions(job, definition.screening_questions)
             self._apply_definition(job, definition, questions)
             job.revision += 1
@@ -131,7 +132,7 @@ class JobService:
             if JobStatus(job.status) is JobStatus.READY:
                 raise JobAlreadyReadyError()
 
-            self._assert_unique_question_keys(definition.screening_questions)
+            assert_unique_screening_question_keys(definition.screening_questions)
             questions = self._reconcile_questions(job, definition.screening_questions)
             self._validate_ready_definition(questions)
             self._apply_definition(job, definition, questions)
@@ -245,22 +246,6 @@ class JobService:
             missing.append("screening_questions")
         if missing:
             raise JobDefinitionIncompleteError(missing=missing)
-
-    @staticmethod
-    def _assert_unique_question_keys(
-        questions: list[ScreeningQuestionCreate] | list[ScreeningQuestionEdit],
-    ) -> None:
-        """Reject duplicate canonical question keys with a stable domain error code."""
-
-        seen: set[str] = set()
-        for question in questions:
-            if question.key in seen:
-                raise ScreeningQuestionIdentityError(
-                    code="SCREENING_QUESTION_KEY_DUPLICATE",
-                    message="Screening question keys must be unique within a Job.",
-                    details={"key": question.key},
-                )
-            seen.add(question.key)
 
     @staticmethod
     def _materialize_new_questions(

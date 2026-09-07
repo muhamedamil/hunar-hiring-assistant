@@ -21,6 +21,7 @@ from app.candidates.schemas import (
     CandidateExternalIdentityResponse,
     CandidateListResponse,
     CandidateMatchingSnapshot,
+    CandidateOutreachContactSnapshot,
     CandidateProfileInput,
     CandidateResponse,
     CandidateSummaryResponse,
@@ -117,6 +118,22 @@ class CandidateService:
 
         candidate = self._require_locked_candidate(candidate_id)
         return self._to_matching_snapshot(candidate)
+
+    def lock_outreach_contact_for_downstream_binding(
+        self,
+        candidate_id: UUID,
+    ) -> CandidateOutreachContactSnapshot:
+        """Lock Candidate truth and expose only identity plus canonical outreach phone.
+
+        The caller owns the surrounding transaction. The snapshot intentionally excludes
+        Candidate revision because non-contact edits must not stale an outreach request.
+        """
+
+        candidate = self._require_locked_candidate(candidate_id)
+        return CandidateOutreachContactSnapshot(
+            candidate_id=candidate.id,
+            phone_e164=candidate.phone_e164,
+        )
 
     def get_matching_snapshot(self, candidate_id: UUID) -> CandidateMatchingSnapshot:
         """Return current matching evidence without exposing Candidate contact PII."""

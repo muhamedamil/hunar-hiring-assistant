@@ -9,7 +9,7 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
 from app.candidates.schemas import CandidateCreateRequest
@@ -97,12 +97,17 @@ def _create_ready_job(factory) -> UUID:
         return created.id
 
 
-def _create_candidate(factory, name: str) -> UUID:
+def _create_candidate(
+    factory,
+    name: str,
+    *,
+    current_title: str = "Backend Engineer",
+) -> UUID:
     with factory() as session:
         return CandidateService(session).create_manual_candidate(
             CandidateCreateRequest(
                 full_name=name,
-                current_title="Backend Engineer",
+                current_title=current_title,
                 location="Bangalore",
             )
         ).id
@@ -206,7 +211,7 @@ def test_completed_matches_are_immutable_and_score_cannot_exceed_coverage(
             {"match_id": match_id, "id": relation_id},
         )
 
-    with pytest.raises(IntegrityError), session_factory.begin() as session:
+    with pytest.raises(ProgrammingError), session_factory.begin() as session:
         session.execute(
             text("update public.job_candidate_matches set match_score=60 where id=:id"),
             {"id": match_id},
@@ -328,7 +333,11 @@ def test_concurrent_manual_attachments_create_one_relation_and_one_semantic_anal
     session_factory,
 ) -> None:
     job_id = _create_ready_job(session_factory)
-    candidate_id = _create_candidate(session_factory, "Concurrent Candidate")
+    candidate_id = _create_candidate(
+        session_factory,
+        "Concurrent Candidate",
+        current_title="Platform Engineer",
+    )
     provider = _BlockingMatchProvider()
 
     def attach():

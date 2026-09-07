@@ -25,6 +25,7 @@ from app.matching.models import JobCandidate, JobCandidateMatch
 from app.matching.repository import MatchingRepository
 from app.matching.schemas import (
     CallReadiness,
+    DownstreamOutreachShortlist,
     JobCandidateDetailResponse,
     JobCandidateListResponse,
     JobCandidateSource,
@@ -458,6 +459,59 @@ class MatchingService:
                 return_id = relation.id
         return self.get_job_candidate(return_id)
 
+    def lock_current_shortlist_for_downstream_outreach(
+        self,
+        relation_id: UUID,
+    ) -> DownstreamOutreachShortlist:
+        """Lock and prove the exact current shortlist authority consumed by Module 5.
+
+        The caller owns the transaction. Lock order is JobCandidate, Job, then Candidate,
+        matching the established Module 4 multi-authority mutation order.
+        """
+
+        relation = self._require_locked_relation(relation_id)
+        if (
+            relation.shortlist_status != ShortlistStatus.SHORTLISTED.value
+            or relation.current_match_id is None
+            or relation.decision_match_id != relation.current_match_id
+        ):
+            raise MatchStateConflictError(
+                code="OUTREACH_SHORTLIST_NOT_CURRENT",
+                message="A current shortlisted decision is required before outreach.",
+            )
+
+        definition = JobService(self._session).lock_ready_definition_for_downstream_binding(
+            relation.job_id
+        )
+        candidate = CandidateService(
+            self._session
+        ).lock_matching_snapshot_for_downstream_binding(relation.candidate_id)
+        match = self._repository.get_match(self._session, relation.current_match_id)
+        if match is None or match.status != MatchStatus.COMPLETED.value:
+            raise MatchStateConflictError(
+                code="OUTREACH_MATCH_NOT_COMPLETED",
+                message="A completed current match is required before outreach.",
+            )
+
+        source = self._source_for_relation(relation)
+        current = self._build_input(definition, candidate, source)
+        if (
+            match.definition_version != definition.version
+            or hash_match_input(current) != match.input_hash
+            or match.matcher_version != MATCH_POLICY_VERSION
+        ):
+            raise MatchStateConflictError(
+                code="OUTREACH_MATCH_STALE",
+                message="Refresh and shortlist the current match before outreach.",
+            )
+
+        return DownstreamOutreachShortlist(
+            job_candidate_id=relation.id,
+            job_id=relation.job_id,
+            candidate_id=relation.candidate_id,
+            decision_match_id=match.id,
+            definition_version=match.definition_version,
+        )
 
     @staticmethod
     def _constraint_name(exc: IntegrityError) -> str | None:
@@ -505,9 +559,9 @@ class MatchingService:
         definition = JobService(self._session).lock_ready_definition_for_downstream_binding(
             relation.job_id
         )
-        candidate = CandidateService(
-            self._session
-        ).lock_matching_snapshot_for_downstream_binding(relation.candidate_id)
+        candidate = CandidateService(self._session).lock_matching_snapshot_for_downstream_binding(
+            relation.candidate_id
+        )
         source = self._source_for_relation(relation)
         return self._build_input(definition, candidate, source), candidate
 

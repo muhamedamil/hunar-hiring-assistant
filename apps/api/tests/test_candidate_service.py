@@ -188,6 +188,19 @@ def test_manual_candidate_can_exist_with_name_only_at_revision_zero() -> None:
     assert candidate.external_identities == []
 
 
+def test_outreach_contact_binding_returns_only_identity_and_canonical_phone() -> None:
+    service, repository = create_service()
+    created = create_manual(service)
+    repository.candidates[created.id].phone_e164 = "+919876543210"
+
+    snapshot = service.lock_outreach_contact_for_downstream_binding(created.id)
+
+    assert snapshot.model_dump() == {
+        "candidate_id": created.id,
+        "phone_e164": "+919876543210",
+    }
+
+
 def test_same_name_without_strong_identity_does_not_auto_merge() -> None:
     service, repository = create_service()
 
