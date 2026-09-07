@@ -1,0 +1,513 @@
+{
+  "source": "https://api.voice.hunar.ai/docs/external/openapi.json",
+  "retrieved": "2026-09-07",
+  "openapi_sha256": "5e4eef9cf45372f6d13237365267a5283979ffb76f05ddf20cfa5d73a72a1908",
+  "schemas": {
+    "VoiceCallLanguage": {
+      "enum": [
+        "ENGLISH",
+        "HINDI",
+        "TAMIL",
+        "TELUGU",
+        "KANNADA",
+        "MARATHI",
+        "MALAYALAM",
+        "GUJARATI",
+        "BENGALI",
+        "TURKISH",
+        "ARABIC",
+        "SPANISH"
+      ],
+      "title": "VoiceCallLanguage",
+      "type": "string"
+    },
+    "Timezone": {
+      "description": "IANA timezone names supported by the system.",
+      "enum": [
+        "Asia/Kolkata",
+        "America/New_York",
+        "America/Los_Angeles",
+        "America/Chicago",
+        "America/Denver",
+        "America/Detroit",
+        "America/Kentucky/Louisville",
+        "America/Kentucky/Monticello",
+        "America/Indiana/Indianapolis",
+        "America/Indiana/Vincennes",
+        "America/Indiana/Winamac",
+        "America/Indiana/Marengo",
+        "America/Indiana/Petersburg",
+        "America/Indiana/Vevay",
+        "America/Indiana/Tell_City",
+        "America/Indiana/Knox",
+        "America/Menominee",
+        "America/North_Dakota/Center",
+        "America/North_Dakota/New_Salem",
+        "America/North_Dakota/Beulah",
+        "America/Boise",
+        "America/Phoenix",
+        "America/Anchorage",
+        "America/Juneau",
+        "America/Sitka",
+        "America/Metlakatla",
+        "America/Yakutat",
+        "America/Nome",
+        "America/Adak",
+        "Pacific/Honolulu",
+        "Asia/Riyadh",
+        "Europe/London"
+      ],
+      "title": "Timezone",
+      "type": "string"
+    },
+    "VoicePersona": {
+      "enum": [
+        "NEHA",
+        "ROY",
+        "ZOE",
+        "SAM",
+        "MIRA",
+        "EESHA"
+      ],
+      "title": "VoicePersona",
+      "type": "string"
+    },
+    "AgentStatus": {
+      "enum": [
+        "DRAFT",
+        "ACTIVE",
+        "ARCHIVED"
+      ],
+      "title": "AgentStatus",
+      "type": "string"
+    },
+    "CallStatus": {
+      "enum": [
+        "NOT_STARTED",
+        "SCHEDULED",
+        "INITIATED",
+        "RINGING",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "NOT_CONNECTED",
+        "CANCELLED",
+        "FAILED"
+      ],
+      "title": "CallStatus",
+      "type": "string"
+    },
+    "AgentDetailResponseSchema": {
+      "description": "Schema for Agent response",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/components/schemas/AgentStatus",
+          "description": "Agent status"
+        },
+        "name": {
+          "description": "Agent name",
+          "title": "Name",
+          "type": "string"
+        },
+        "voice_persona": {
+          "$ref": "#/components/schemas/VoicePersona",
+          "description": "Voice persona"
+        },
+        "persona_name": {
+          "description": "Persona name for the agent",
+          "title": "Persona Name",
+          "type": "string"
+        },
+        "voice_name": {
+          "description": "Voice name for the agent",
+          "title": "Voice Name",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent short summary",
+          "title": "Summary"
+        },
+        "logo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent logo",
+          "title": "Logo"
+        },
+        "language": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/VoiceCallLanguage"
+            }
+          ],
+          "default": "ENGLISH",
+          "description": "Language for the agent"
+        },
+        "custom_variables": {
+          "description": "Custom variables defined in the Agent prompt templates (excluding required variables)",
+          "example": [
+            "location",
+            "job_role",
+            "company"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Custom Variables",
+          "type": "array"
+        },
+        "result_schema": {
+          "additionalProperties": true,
+          "description": "Expected result schema",
+          "title": "Result Schema",
+          "type": "object"
+        },
+        "agent_code": {
+          "description": "Agent number unique identifier at organization level",
+          "title": "Agent Code",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "Creation timestamp",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "agent_prompt": {
+          "description": "Main agent prompt",
+          "title": "Agent Prompt",
+          "type": "string"
+        },
+        "introduction": {
+          "description": "Introduction text",
+          "title": "Introduction",
+          "type": "string"
+        },
+        "objective": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent objective text",
+          "title": "Objective"
+        },
+        "introduction_prompt": {
+          "description": "Introduction prompt text",
+          "title": "Introduction Prompt",
+          "type": "string"
+        },
+        "silence_response": {
+          "description": "Response when there's silence",
+          "title": "Silence Response",
+          "type": "string"
+        },
+        "conclusion": {
+          "description": "Conclusion response text",
+          "title": "Conclusion",
+          "type": "string"
+        },
+        "result_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Result generation prompt",
+          "title": "Result Prompt"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "name",
+        "voice_persona",
+        "persona_name",
+        "voice_name",
+        "summary",
+        "logo",
+        "agent_code",
+        "created_at",
+        "agent_prompt",
+        "introduction",
+        "objective",
+        "introduction_prompt",
+        "silence_response",
+        "conclusion",
+        "result_prompt"
+      ],
+      "title": "AgentDetailResponseSchema",
+      "type": "object"
+    },
+    "CallCreateSchema": {
+      "description": "Schema for call creation via API.",
+      "properties": {
+        "timezone": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/Timezone"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Timezone for this call"
+        },
+        "from_phone_number": {
+          "anyOf": [
+            {
+              "examples": [
+                "+91xxxxxxxxxx"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "From phone number",
+          "title": "From Phone Number"
+        },
+        "callback_config": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/CallCallbackConfigSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Webhook URLs"
+        },
+        "retry_config": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/RetryConfigSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retry configuration"
+        },
+        "guardrails": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GuardrailsSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Guardrails"
+        },
+        "callee_name": {
+          "description": "Callee name",
+          "title": "Callee Name",
+          "type": "string"
+        },
+        "mobile_number": {
+          "description": "Mobile number",
+          "examples": [
+            "+91xxxxxxxxxx"
+          ],
+          "title": "Mobile Number",
+          "type": "string"
+        },
+        "custom_data": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom data",
+          "title": "Custom Data",
+          "type": "object"
+        },
+        "agent_id": {
+          "description": "Agent ID",
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "Request tracking identifier. Auto-generated if not provided.",
+          "maxLength": 64,
+          "title": "Request Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "callee_name",
+        "mobile_number",
+        "agent_id"
+      ],
+      "title": "CallCreateSchema",
+      "type": "object"
+    },
+    "CallCreateResponseSchema": {
+      "description": "Summary response schema for call creation.",
+      "properties": {
+        "id": {
+          "description": "Call ID",
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "Request ID for this batch",
+          "maxLength": 64,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/components/schemas/CallStatus",
+          "description": "Call status"
+        },
+        "callee_name": {
+          "description": "Callee name",
+          "title": "Callee Name",
+          "type": "string"
+        },
+        "mobile_number": {
+          "description": "Mobile number",
+          "examples": [
+            "+91xxxxxxxxxx"
+          ],
+          "title": "Mobile Number",
+          "type": "string"
+        },
+        "timezone": {
+          "$ref": "#/components/schemas/Timezone",
+          "description": "Timezone"
+        },
+        "from_phone_number": {
+          "anyOf": [
+            {
+              "examples": [
+                "+91xxxxxxxxxx"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "From phone number",
+          "title": "From Phone Number"
+        },
+        "callback_config": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/CallCallbackConfigSchema"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Callback config",
+          "title": "Callback Config"
+        },
+        "retry_config": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/RetryConfigSchema"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retry config",
+          "title": "Retry Config"
+        },
+        "guardrails": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GuardrailsSchema"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Guardrails",
+          "title": "Guardrails"
+        }
+      },
+      "required": [
+        "id",
+        "request_id",
+        "status",
+        "callee_name",
+        "mobile_number",
+        "timezone"
+      ],
+      "title": "CallCreateResponseSchema",
+      "type": "object"
+    },
+    "RetryConfigSchema": {
+      "description": "Retry configuration for call scheduling.\n\nDefault value is None (no retries).\nTo enable retries, set both fields:\n- max_retry_count: 0-10 (number of retry attempts, 0 means no retries)\n- retry_interval_hours: 0-24 (hours between retries, 0 means no retries)\n\nAt organization storage level, None means unset (runtime applies 0, 0).",
+      "properties": {
+        "max_retry_count": {
+          "description": "Maximum number of retry attempts",
+          "examples": [
+            3
+          ],
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Max Retry Count",
+          "type": "integer"
+        },
+        "retry_interval_hours": {
+          "description": "Interval between retries in hours",
+          "examples": [
+            6
+          ],
+          "maximum": 24,
+          "minimum": 0,
+          "title": "Retry Interval Hours",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_retry_count",
+        "retry_interval_hours"
+      ],
+      "title": "RetryConfigSchema",
+      "type": "object"
+    }
+  }
+}
