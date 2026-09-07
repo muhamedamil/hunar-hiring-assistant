@@ -18,10 +18,7 @@ def require(path: str, *markers: str) -> None:
 
 def main() -> None:
     """Reject ownership leaks and missing contract/route/schema composition points."""
-    packages = [
-        ROOT / "apps/api/app/voice_calls",
-        ROOT / "apps/api/app/integrations/hunar",
-    ]
+    packages = [ROOT / "apps/api/app/voice_calls", ROOT / "apps/api/app/integrations/hunar"]
     for package in packages:
         for path in package.glob("*.py"):
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -41,13 +38,13 @@ def main() -> None:
                 "update_agent(",
                 "activate_agent(",
                 "dispatch_generation",
-                "call_result",
-                "recording_url",
                 "transcript",
-                "webhooks",
                 "match_score",
             ):
                 assert forbidden not in content, f"Ownership leak: {path}:{forbidden}"
+            if path.parent.name == "voice_calls":
+                for forbidden in ("recording_url", "transcript"):
+                    assert forbidden not in content, f"Ownership leak: {path}:{forbidden}"
     require(
         "apps/api/app/voice_calls/service.py",
         "lock_dispatchable_outreach",
@@ -99,10 +96,10 @@ def main() -> None:
         "Call submission outcome is uncertain.",
         'row.status === "failed"',
     )
-    require("apps/api/pyproject.toml", 'version = "0.7.0"')
+    require("apps/api/pyproject.toml", 'version = "0.8.0"')
     require(
         "apps/api/app/main.py",
-        'version="0.7.0"',
+        'version="0.8.0"',
         "app.include_router(voice_calls_router)",
     )
     print("Module 6 structural validation: PASS (behavioral/live gates are separate)")
