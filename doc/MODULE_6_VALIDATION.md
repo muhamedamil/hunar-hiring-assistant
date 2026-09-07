@@ -1,7 +1,7 @@
 # Module 6 validation and handoff
 
-Module 6 implements durable Hunar submission truth. **Release freeze remains blocked** until the
-remaining disposable PostgreSQL and controlled live Hunar gates pass.
+Module 6 implements durable Hunar submission truth and is frozen as the upstream authority for
+Module 7. Historical qualification limitations below remain recorded rather than reclassified.
 
 ## Authoritative baseline and changes
 

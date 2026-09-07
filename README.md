@@ -1,4 +1,4 @@
-# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3 + 4 + 5 + 6
+# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7
 
 This repository contains the application foundation, shared **Job & Screening Definition** authority, global **Candidate Core**, Job-bound **People Search & Contact Enrichment**, and shared **Candidate ↔ Job Matching & Shortlisting** workflow for the Hunar.ai hiring-assistant assessment.
 
@@ -10,6 +10,8 @@ Current scope:
 - **Module 3 — People Search & Contact Enrichment:** READY-Job-bound Apollo search evidence, deliberate enrichment, asynchronous phone recovery, and Candidate Core resolution.
 - **Module 4 — Candidate ↔ Job Matching & Shortlisting:** one shared manual/sourced Candidate↔Job relation, immutable version-bound evidence assessment, optional constrained Gemini role/seniority classification, call readiness, and recruiter-owned shortlist truth.
 - **Module 5 — Outreach:** one shared preparation flow that freezes canonical phone and customized screening questions into an immutable, execution-ready context without calling Hunar.
+- **Module 6 — Hunar voice submission:** immutable call-submission intent and provider-acceptance certainty.
+- **Module 7 — Call results:** signed terminal evidence, human-gated screening answers, and safe GET-only recovery.
 
 ## Core Module 1 invariant
 
@@ -552,13 +554,14 @@ Run the cumulative backend/database and frontend gates documented in `doc/MODULE
 Module 6 implements one immutable call-submission execution per Module 5 outreach request.
 The existing outreach detail page provides **Start voice screening**, English/timezone selection,
 submission certainty and FAILED-only **Retry dispatch**. SUBMITTED means provider acceptance,
-not call completion. UNKNOWN is never normally retried. Module 7 still owns lifecycle/results/recovery.
+not call completion. UNKNOWN is never normally retried. Module 7 owns lifecycle/results/recovery and
+never rewrites this submission state.
 
 Provision an ACTIVE English agent using the exact immutable
 [`hunar_voice_screening_en_v1` contract](doc/MODULE_6_HUNAR_AGENT_CONTRACT.md), then set the backend
 HUNAR variables in `apps/api/.env.example`. Runtime never creates, updates or activates agents.
-Hunar automatic redial is always disabled. Leave the optional summary callback blank unless an
-actual compatible HTTPS receiver already exists. No callback receiver is implemented here.
+Hunar automatic redial is always disabled. Configure the optional summary callback to Module 7's
+signed HTTPS receiver for newly created calls.
 
 Run the existing API and worker processes. The worker now composes both sourcing and voice dispatch
 and both UNKNOWN reconcilers through the existing callback. Browser clients use only
@@ -568,3 +571,16 @@ Qualification status: implementation and available automated gates are documente
 [Module 6 validation](doc/MODULE_6_VALIDATION.md). Disposable PostgreSQL and controlled live Hunar
 qualification are required before freezing Module 6. See the
 [implementation ledger](doc/MODULE_6_IMPLEMENTATION_LEDGER.md) for boundary decisions.
+
+## Module 7 — Call events, screening results and recovery (0.8.0)
+
+Module 7 receives signed `call_summary` webhooks, verifies exact raw bytes before JSON parsing,
+and persists one terminal result per Module 6 execution. Only a COMPLETED call explicitly answered
+by a HUMAN can produce normalized answers, and each numbered result maps to the exact immutable
+Module 5 question UUID. Machine, unknown-human, nonconnected, failed and cancelled outcomes never
+become Candidate answers.
+
+The outreach detail flow polls only the local result endpoint. An explicit reconciliation action
+performs one read-only Hunar GET only when Module 6 already knows the exact call ID. Module 7 never
+creates/retries a call, changes Module 6 submission certainty, exposes recording URLs, or makes a
+hiring decision. See [Module 7 validation](doc/MODULE_7_VALIDATION.md).
