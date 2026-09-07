@@ -12,6 +12,7 @@ from app.core.database import check_database_connection
 from app.core.errors import DatabaseUnavailableError, register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
+from app.dashboard.router import router as dashboard_router
 from app.jobs.router import router as jobs_router
 from app.matching.router import router as matching_router
 from app.outreach.router import router as outreach_router
@@ -27,7 +28,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Hunar Hiring Assistant API",
-        version="0.8.0",
+        version="0.9.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(outreach_router)
     app.include_router(voice_calls_router)
     app.include_router(call_results_router)
+    app.include_router(dashboard_router)
 
     @app.get("/api/v1/health/live", tags=["health"])
     def live() -> dict[str, str]:

@@ -96,10 +96,8 @@ def main() -> None:
         "Call submission outcome is uncertain.",
         'row.status === "failed"',
     )
-    require("apps/api/pyproject.toml", 'version = "0.8.0"')
     require(
         "apps/api/app/main.py",
-        'version="0.8.0"',
         "app.include_router(voice_calls_router)",
     )
     print("Module 6 structural validation: PASS (behavioral/live gates are separate)")
