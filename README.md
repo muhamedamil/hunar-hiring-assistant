@@ -1731,3 +1731,11 @@ They make the system more predictable when:
 - or multiple recruiter workflows converge on the same Candidate.
 
 The result is a recruiting workflow where AI and external providers are useful without being allowed to silently redefine application truth.
+
+## Module 8 — recruiter dashboard backend projection
+
+Module 8 STEP 2 adds a read-only recruiter dashboard API projection over existing Modules 0–7 truth.
+It does not add dashboard business state, provider calls, workers, or frontend UI. The three backend
+GET contracts are `/api/v1/dashboard/overview`, `/api/v1/dashboard/screenings`, and
+`/api/v1/dashboard/screenings/{execution_id}`. See `doc/MODULE_8_IMPLEMENTATION_LEDGER.md` and
+`doc/MODULE_8_VALIDATION.md` for the frozen authority and qualification gates.
