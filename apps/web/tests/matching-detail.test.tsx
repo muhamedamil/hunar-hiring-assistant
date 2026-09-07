@@ -139,6 +139,25 @@ describe("JobCandidateDetail", () => {
 
     expect(matchingApi.updateShortlist).toHaveBeenCalledWith(relationId, 4, "shortlisted");
   });
+
+  it.each(["manual", "sourcing"] as const)(
+    "offers the identical outreach path for %s current callable shortlist truth",
+    async (createdSource) => {
+      vi.mocked(matchingApi.getJobCandidate).mockResolvedValue({
+        ...detail(),
+        created_source: createdSource,
+        preferred_sourcing_result_id:
+          createdSource === "sourcing" ? detail().preferred_sourcing_result_id : null,
+        shortlist_status: "shortlisted",
+        decision_is_current: true,
+        decision_match_id: detail().current_match!.id,
+      });
+      renderDetail();
+
+      const link = await screen.findByRole("link", { name: "Prepare voice outreach" });
+      expect(link).toHaveAttribute("href", `/job-candidates/${relationId}/outreach`);
+    },
+  );
 });
 
 it("shows an explicit retry recovery state when the initial assessment is unavailable", async () => {
