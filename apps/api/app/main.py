@@ -15,6 +15,7 @@ from app.jobs.router import router as jobs_router
 from app.matching.router import router as matching_router
 from app.outreach.router import router as outreach_router
 from app.sourcing.router import router as sourcing_router
+from app.voice_calls.router import router as voice_calls_router
 
 
 def create_app() -> FastAPI:
@@ -25,7 +26,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Hunar Hiring Assistant API",
-        version="0.6.0",
+        version="0.7.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(sourcing_router)
     app.include_router(matching_router)
     app.include_router(outreach_router)
+    app.include_router(voice_calls_router)
 
     @app.get("/api/v1/health/live", tags=["health"])
     def live() -> dict[str, str]:
