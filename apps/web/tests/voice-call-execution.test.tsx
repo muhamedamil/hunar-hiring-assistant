@@ -8,6 +8,7 @@ import { api } from "@/lib/api/client";
 import type { VoiceCallExecution } from "@/lib/voice-calls/types";
 
 vi.mock("@/lib/api/client", () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock("@/components/outreach/voice-call-result", () => ({ VoiceCallResultPanel: () => <div>Screening result panel</div> }));
 let execution: VoiceCallExecution | null;
 const options = { languages: ["ENGLISH"], default_language: "ENGLISH", timezones: ["Asia/Kolkata", "Europe/London"], default_timezone: "Asia/Kolkata", automatic_redials: false };
 function row(status: VoiceCallExecution["status"]): VoiceCallExecution {
@@ -15,7 +16,8 @@ function row(status: VoiceCallExecution["status"]): VoiceCallExecution {
 }
 function show(ready = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><VoiceCallExecutionPanel outreachRequestId="outreach" ready={ready} /></QueryClientProvider>);
+  const view = render(<QueryClientProvider client={client}><VoiceCallExecutionPanel outreachRequestId="outreach" ready={ready} /></QueryClientProvider>);
+  return { client, ...view };
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -26,7 +28,8 @@ beforeEach(() => {
 
 it("starts only with configured language and chosen timezone, with redials off", async () => {
   const user = userEvent.setup();
-  show();
+  const { client } = show();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
   const start = await screen.findByRole("button", { name: "Start voice screening" });
   expect(screen.getByText("Automatic redials: Off")).toBeInTheDocument();
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -34,7 +37,8 @@ it("starts only with configured language and chosen timezone, with redials off",
   await user.selectOptions(screen.getByLabelText("Timezone"), "Europe/London");
   await user.click(start);
   expect(api.post).toHaveBeenCalledWith("/outreach-requests/outreach/voice-call-executions", { language: "ENGLISH", timezone: "Europe/London" });
-  expect(await screen.findByText("Preparing voice call…")).toBeInTheDocument();
+  expect(await screen.findByText("Queued")).toBeInTheDocument();
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["outreach"] }));
 });
 
 it("does not show Start for stale outreach", async () => {
@@ -44,15 +48,14 @@ it("does not show Start for stale outreach", async () => {
 });
 
 it.each([
-  ["queued", "Preparing voice call…"],
-  ["submitted", "Call submitted to Hunar"],
-  ["unknown", "Call submission outcome is uncertain."],
+  ["queued", "Queued"],
+  ["submitted", "Submitted"],
+  ["unknown", "Unknown"],
 ] as const)("renders %s without a retry action", async (status, label) => {
   execution = row(status);
   show();
   expect(await screen.findByText(label)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Retry dispatch" })).not.toBeInTheDocument();
-  if (status === "submitted") expect(screen.getByText(/does not mean the call is complete/)).toBeInTheDocument();
 });
 
 it("retries FAILED by ID without modifying frozen inputs", async () => {
@@ -65,7 +68,7 @@ it("retries FAILED by ID without modifying frozen inputs", async () => {
 it("hides retry when FAILED outreach has become stale", async () => {
   execution = row("failed");
   show(false);
-  await screen.findByText("Call could not be submitted");
+  await screen.findByText("Failed");
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });
 

@@ -1,3 +1,4 @@
+import type { DashboardScreeningState, VoiceCallSubmissionStatus } from "@/lib/dashboard/types";
 import type { ScreeningAnswerType } from "@/lib/jobs/types";
 
 export type OutreachReadiness = "READY_FOR_EXECUTION" | "STALE";
@@ -34,6 +35,12 @@ export interface OutreachRequest {
   id: string;
   job_candidate_id: string;
   decision_match_id: string;
+  job_id: string;
+  job_title: string;
+  job_definition_version: number;
+  execution_id: string | null;
+  screening_state: DashboardScreeningState | null;
+  submission_status: VoiceCallSubmissionStatus | null;
   candidate_name: string;
   candidate_location: string | null;
   masked_phone: string;

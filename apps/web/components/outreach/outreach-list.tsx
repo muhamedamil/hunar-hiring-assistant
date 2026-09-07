@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import { ScreeningStateBadge } from "@/components/dashboard/screening-state-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listOutreachRequests } from "@/lib/outreach/api";
@@ -16,14 +18,14 @@ export function OutreachList() {
   const listQuery = useQuery({
     queryKey: outreachKeys.list(offset),
     queryFn: () => listOutreachRequests(PAGE_SIZE, offset),
+    refetchInterval: 5_000,
   });
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium text-slate-500">Module 5</p>
         <h1 className="text-3xl font-semibold tracking-tight">Outreach</h1>
-        <p className="mt-2 text-sm text-slate-600">Immutable voice-screening contexts ready for future execution.</p>
+        <p className="mt-2 text-sm text-slate-600">Voice screening outreach and its current execution or result state.</p>
       </div>
       <Card>
         <CardHeader><CardTitle>Outreach requests</CardTitle></CardHeader>
@@ -36,16 +38,10 @@ export function OutreachList() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{request.candidate_name}</p>
-                  {request.candidate_location ? (
-                    <p className="text-sm text-slate-600">{request.candidate_location}</p>
-                  ) : null}
-                  <p className="mt-1 text-sm text-slate-500">
-                    {request.requested_action} · {request.masked_phone} · {request.screening_questions.length} questions
-                  </p>
+                  <p className="mt-1 text-sm text-slate-700">{request.job_title}</p>
+                  <p className="mt-1 text-xs text-slate-500">Job version v{request.job_definition_version} · {request.screening_questions.length} questions</p>
                 </div>
-                <span className={request.readiness === "READY_FOR_EXECUTION" ? "text-sm font-medium text-emerald-700" : "text-sm font-medium text-amber-700"}>
-                  {request.readiness.replaceAll("_", " ")}
-                </span>
+                {request.screening_state ? <ScreeningStateBadge state={request.screening_state} /> : request.readiness === "READY_FOR_EXECUTION" ? <Badge className="bg-emerald-100 text-emerald-800">Ready for execution</Badge> : <Badge className="bg-amber-100 text-amber-800">Outreach context changed</Badge>}
               </div>
             </Link>
           ))}

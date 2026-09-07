@@ -72,6 +72,12 @@ beforeEach(() => {
     id: "55555555-5555-4555-8555-555555555555",
     job_candidate_id: relationId,
     decision_match_id: "66666666-6666-4666-8666-666666666666",
+    job_id: "11111111-1111-4111-8111-111111111111",
+    job_title: "Backend Engineer",
+    job_definition_version: 2,
+    execution_id: null,
+    screening_state: null,
+    submission_status: null,
     candidate_name: "Aisha Khan",
     candidate_location: "Bengaluru",
     masked_phone: "+91••••••3210",
@@ -98,6 +104,12 @@ beforeEach(() => {
         id: "55555555-5555-4555-8555-555555555555",
         job_candidate_id: relationId,
         decision_match_id: "66666666-6666-4666-8666-666666666666",
+        job_id: "11111111-1111-4111-8111-111111111111",
+        job_title: "Backend Engineer",
+        job_definition_version: 2,
+        execution_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        screening_state: "result_available",
+        submission_status: "unknown",
         candidate_name: "Aisha Khan",
         candidate_location: "Bengaluru",
         masked_phone: "+91••••••3210",
@@ -112,6 +124,12 @@ beforeEach(() => {
         id: "88888888-8888-4888-8888-888888888888",
         job_candidate_id: "99999999-9999-4999-8999-999999999999",
         decision_match_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        job_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        job_title: "Data Engineer",
+        job_definition_version: 1,
+        execution_id: null,
+        screening_state: null,
+        submission_status: null,
         candidate_name: "No Location Candidate",
         candidate_location: null,
         masked_phone: "+91••••••4567",
@@ -158,12 +176,16 @@ describe("OutreachPreparation", () => {
 });
 
 describe("OutreachList", () => {
-  it("shows Candidate names and only renders locations when available", async () => {
+  it("shows Candidate, historical Job/role, and the most advanced authoritative state", async () => {
     renderList();
 
     expect(await screen.findByText("Aisha Khan")).toBeInTheDocument();
-    expect(screen.getByText("Bengaluru")).toBeInTheDocument();
     expect(screen.getByText("No Location Candidate")).toBeInTheDocument();
-    expect(screen.queryByText("Location unavailable")).not.toBeInTheDocument();
+    expect(screen.getByText("Backend Engineer")).toBeInTheDocument();
+    expect(screen.getByText("Data Engineer")).toBeInTheDocument();
+    expect(screen.getByText("Result available")).toBeInTheDocument();
+    expect(screen.getByText("Ready for execution")).toBeInTheDocument();
+    expect(screen.queryByText("+91••••••3210")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Module 5/)).not.toBeInTheDocument();
   });
 });
