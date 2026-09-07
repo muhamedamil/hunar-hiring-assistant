@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict
 
 from app.call_results.errors import CallResultError
 from app.integrations.hunar.schemas import (
@@ -76,22 +76,22 @@ class CandidateInterest(StrEnum):
 
 
 class ScreeningResultV1(BaseModel):
-    """Exact strict result object frozen by the Module 6 English v1 agent contract."""
+    """Normalized, display-safe result extracted from the provider payload."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
+    model_config = ConfigDict(extra="ignore", frozen=True, hide_input_in_errors=True)
     conversation_outcome: ConversationOutcome
     candidate_interest: CandidateInterest
-    question_1_answer: StrictStr
-    question_2_answer: StrictStr
-    question_3_answer: StrictStr
-    question_4_answer: StrictStr
-    question_5_answer: StrictStr
-    question_6_answer: StrictStr
-    question_7_answer: StrictStr
-    question_8_answer: StrictStr
-    question_9_answer: StrictStr
-    question_10_answer: StrictStr
-    notes: StrictStr
+    question_1_answer: str | None = None
+    question_2_answer: str | None = None
+    question_3_answer: str | None = None
+    question_4_answer: str | None = None
+    question_5_answer: str | None = None
+    question_6_answer: str | None = None
+    question_7_answer: str | None = None
+    question_8_answer: str | None = None
+    question_9_answer: str | None = None
+    question_10_answer: str | None = None
+    notes: str
 
 
 class ScreeningResultContract(BaseModel):
@@ -102,9 +102,43 @@ class ScreeningResultContract(BaseModel):
     expected_keys: frozenset[str]
 
     def parse(self, value: object) -> ScreeningResultV1:
-        """Validate without coercion or additional provider decision fields."""
+        """Normalize provider variability without losing candidate answer content."""
 
-        return ScreeningResultV1.model_validate(value)
+        if not isinstance(value, dict):
+            raise ValueError("Screening result must be an object")
+
+        outcome = str(value.get("conversation_outcome", "")).strip().lower()
+        interest = str(value.get("candidate_interest", "")).strip().lower()
+        normalized: dict[str, object] = {
+            "conversation_outcome": (
+                outcome if outcome in {item.value for item in ConversationOutcome} else "other"
+            ),
+            "candidate_interest": (
+                interest if interest in {item.value for item in CandidateInterest} else "unclear"
+            ),
+            "notes": _display_text(value.get("notes")) or "",
+        }
+        for position in range(1, 11):
+            key = f"question_{position}_answer"
+            normalized[key] = _display_text(value.get(key))
+        return ScreeningResultV1.model_validate(normalized)
+
+
+def _display_text(value: object) -> str | None:
+    """Convert any JSON answer value to stable text suitable for recruiter display."""
+
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return str(value).strip() or None
 
 
 def get_screening_result_contract(agent_contract_version: str) -> ScreeningResultContract:

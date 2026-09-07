@@ -580,6 +580,13 @@ by a HUMAN can produce normalized answers, and each numbered result maps to the 
 Module 5 question UUID. Machine, unknown-human, nonconnected, failed and cancelled outcomes never
 become Candidate answers.
 
+Provider answer content is normalized for recruiter display instead of rejecting the complete
+screening result: JSON scalars become text, blank/null answers become `no_clear_answer`, and an
+explicit `NOT_ASKED`/`NOT_APPLICABLE` becomes `not_asked`. Unknown summary labels fall back to
+`other`/`unclear`; extra provider fields and unused answer slots are ignored. Call identity,
+terminal status, human-answer confirmation, retry policy, and configured question order remain
+strictly validated.
+
 The outreach detail flow polls only the local result endpoint. An explicit reconciliation action
 performs one read-only Hunar GET only when Module 6 already knows the exact call ID. Module 7 never
 creates/retries a call, changes Module 6 submission certainty, exposes recording URLs, or makes a

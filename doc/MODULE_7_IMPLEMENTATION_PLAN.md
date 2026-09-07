@@ -21,8 +21,12 @@ Recovery — Low-Level Implementation Plan** supplied with the authoritative rep
 - Recovery performs one `GET /calls/{id}/` only for a known call ID and never searches or creates.
 - Only `COMPLETED + HUMAN` can produce answers; retry evidence must prove zero redials.
 - Result parsing is selected by the execution's stored agent-contract version.
+- Provider answer values are permissively normalized for recruiter display; only configured
+  numbered slots map to immutable Module 5 question identities.
 - Terminal identity is immutable; only specified null enrichment and unavailable/invalid-to-available
   transitions are allowed.
+- Webhook/GET timestamps that differ only because of sub-millisecond provider truncation represent
+  the same terminal instant.
 - Recording references remain backend-only; the public contract exposes a Boolean.
 
 ## Checkpoint ledger

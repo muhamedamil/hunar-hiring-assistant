@@ -308,21 +308,46 @@ def test_configured_slot_sentinel_mapping(value: str, state: str, text: str | No
     assert classified.answers[0][2].value == state and classified.answers[0][3] == text
 
 
-@pytest.mark.parametrize("slot,value", [(1, "NOT_APPLICABLE"), (2, "unexpected")])
-def test_configured_not_applicable_and_used_unused_slot_are_invalid(slot: int, value: str) -> None:
-    payload = result_payload()
-    payload[f"question_{slot}_answer"] = value
-    item = evidence(provider_result=payload)
-    assert CallResultService._classify(binding(item), item, questions(1)).state == "invalid"
-
-
 @pytest.mark.parametrize(
-    "change", [{"qualified": "yes"}, {"score": "10"}, {"recommendation": "hire"}]
+    "value,state,text",
+    [
+        (5, "answered", "5"),
+        (True, "answered", "true"),
+        (None, "no_clear_answer", None),
+        ("", "no_clear_answer", None),
+        ("NOT_APPLICABLE", "not_asked", None),
+    ],
 )
-def test_provider_cannot_add_decision_fields(change: dict[str, str]) -> None:
+def test_provider_answer_values_are_normalized_for_display(value, state, text) -> None:
+    payload = result_payload()
+    payload["question_1_answer"] = value
+    item = evidence(provider_result=payload)
+    classified = CallResultService._classify(binding(item), item, questions(1))
+    assert classified.state == "available"
+    assert classified.answers[0][2].value == state
+    assert classified.answers[0][3] == text
+
+
+def test_unused_slots_and_extra_provider_fields_do_not_hide_configured_answers() -> None:
+    change = {"qualified": "yes", "question_2_answer": "unexpected"}
     payload = {**result_payload(), **change}
     item = evidence(provider_result=payload)
-    assert CallResultService._classify(binding(item), item, questions(1)).state == "invalid"
+    classified = CallResultService._classify(binding(item), item, questions(1))
+    assert classified.state == "available"
+    assert len(classified.answers) == 1
+
+
+def test_unknown_summary_labels_fall_back_without_hiding_answers() -> None:
+    payload = {
+        **result_payload(),
+        "conversation_outcome": "provider_new_value",
+        "candidate_interest": None,
+    }
+    item = evidence(provider_result=payload)
+    classified = CallResultService._classify(binding(item), item, questions(1))
+    assert classified.state == "available"
+    assert classified.conversation_outcome == "other"
+    assert classified.candidate_interest == "unclear"
 
 
 def test_unavailable_monotonically_enriches_to_available_once() -> None:
@@ -346,6 +371,24 @@ def test_unavailable_monotonically_enriches_to_available_once() -> None:
     assert row.screening_result_state == "available"
     assert row.answered_by == "HUMAN" and row.duration_seconds == 42
     assert len(repository.inserted) == 1 and repository.enriched == 1
+
+
+def test_submillisecond_timestamp_truncation_is_not_a_terminal_conflict() -> None:
+    repository = RecordingRepository()
+    service = convergence_service(repository)
+    row = stored_result()
+    incoming = stored_result()
+    incoming.voice_call_execution_id = row.voice_call_execution_id
+    incoming.provider_call_id = row.provider_call_id
+    row.started_at = datetime(2026, 9, 7, 10, 54, 25, 809710, tzinfo=UTC)
+    incoming.started_at = datetime(2026, 9, 7, 10, 54, 25, 809000, tzinfo=UTC)
+    classified = ClassifiedScreening(ScreeningResultState.INVALID, "HUNAR_RESULT_SCHEMA_INVALID")
+    assert service._converge_existing(row, incoming, classified) is row
+
+    incoming.started_at = datetime(2026, 9, 7, 10, 54, 25, 808000, tzinfo=UTC)
+    with pytest.raises(CallResultError) as caught:
+        service._converge_existing(row, incoming, classified)
+    assert caught.value.code == "HUNAR_TERMINAL_EVIDENCE_CONFLICT"
 
 
 def test_available_duplicate_is_idempotent_but_conflicting_answers_fail() -> None:

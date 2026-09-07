@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -212,21 +212,17 @@ class CallResultService:
     def _map_answers(
         result: ScreeningResultV1, questions: list[OutreachScreeningQuestion]
     ) -> tuple[tuple[UUID, int, ScreeningAnswerState, str | None], ...]:
-        """Map numbered slots to exact Module 5 UUIDs and require unused sentinel slots."""
+        """Map configured numbered slots to exact Module 5 UUIDs and display states."""
 
         mapped: list[tuple[UUID, int, ScreeningAnswerState, str | None]] = []
         for position in range(1, 11):
-            value = str(getattr(result, f"question_{position}_answer")).strip()
+            value = getattr(result, f"question_{position}_answer")
             if position > len(questions):
-                if value != "NOT_APPLICABLE":
-                    raise ValueError("Unused result slot is not NOT_APPLICABLE")
                 continue
-            if not value or value == "NOT_APPLICABLE":
-                raise ValueError("Configured result slot is invalid")
             question = questions[position - 1]
-            if value == "NO_CLEAR_ANSWER":
+            if value in (None, "NO_CLEAR_ANSWER"):
                 state, answer_text = ScreeningAnswerState.NO_CLEAR_ANSWER, None
-            elif value == "NOT_ASKED":
+            elif value in ("NOT_ASKED", "NOT_APPLICABLE"):
                 state, answer_text = ScreeningAnswerState.NOT_ASKED, None
             else:
                 state, answer_text = ScreeningAnswerState.ANSWERED, value
@@ -282,7 +278,11 @@ class CallResultService:
             raise CallResultError("HUNAR_TERMINAL_EVIDENCE_CONFLICT")
         for field in ("answered_by", "duration_seconds", "started_at", "ended_at"):
             current, observed = getattr(row, field), getattr(incoming, field)
-            if current is not None and observed is not None and current != observed:
+            if (
+                current is not None
+                and observed is not None
+                and not self._equivalent_terminal_value(field, current, observed)
+            ):
                 raise CallResultError("HUNAR_TERMINAL_EVIDENCE_CONFLICT")
             if current is None and observed is not None:
                 setattr(row, field, observed)
@@ -301,6 +301,18 @@ class CallResultService:
         row.updated_at = datetime.now(UTC)
         self._repository.enrich_result(self._session, row)
         return row
+
+    @staticmethod
+    def _equivalent_terminal_value(field: str, current: object, observed: object) -> bool:
+        """Treat sub-millisecond provider timestamp truncation as the same instant."""
+
+        if field in {"started_at", "ended_at"}:
+            return (
+                isinstance(current, datetime)
+                and isinstance(observed, datetime)
+                and abs(current - observed) < timedelta(milliseconds=1)
+            )
+        return current == observed
 
     def _insert_answers(self, row: VoiceCallResult, classified: ClassifiedScreening) -> None:
         answers = [
