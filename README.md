@@ -1,4 +1,4 @@
-# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3 + 4
+# Hunar Hiring Assistant — Modules 0 + 1 + 2 + 3 + 4 + 5
 
 This repository contains the application foundation, shared **Job & Screening Definition** authority, global **Candidate Core**, Job-bound **People Search & Contact Enrichment**, and shared **Candidate ↔ Job Matching & Shortlisting** workflow for the Hunar.ai hiring-assistant assessment.
 
@@ -9,6 +9,7 @@ Current scope:
 - **Module 2 — Candidate Core:** one global Candidate identity shared by manual Task-1 candidates and Task-2 provider-sourced people.
 - **Module 3 — People Search & Contact Enrichment:** READY-Job-bound Apollo search evidence, deliberate enrichment, asynchronous phone recovery, and Candidate Core resolution.
 - **Module 4 — Candidate ↔ Job Matching & Shortlisting:** one shared manual/sourced Candidate↔Job relation, immutable version-bound evidence assessment, optional constrained Gemini role/seniority classification, call readiness, and recruiter-owned shortlist truth.
+- **Module 5 — Outreach:** one shared preparation flow that freezes canonical phone and customized screening questions into an immutable, execution-ready context without calling Hunar.
 
 ## Core Module 1 invariant
 
@@ -93,6 +94,23 @@ Task 2 Review match ───────────┤
 
 Module 3's pre-enrichment recommendation answers **which search results are worth enriching**. Module 4 answers **how the resolved Candidate fits the approved Job evidence that actually exists**. Missing skills/experience remain `unknown`; phone affects call readiness only and never increases fit score.
 
+## Core Module 5 invariant
+
+```text
+Task 1 manual Candidate ─┐
+                         ├─> current Module 4 shortlist
+Task 2 Apollo Candidate ─┘              |
+                                        v
+                         immutable outreach request
+                         phone + exact screening snapshot
+                                        |
+                                        v
+                         future Module 6 execution
+```
+
+Module 5 never branches on Candidate origin. It owns the immutable execution context and derives
+`READY_FOR_EXECUTION` or `STALE`; it does not call Hunar or persist call events/results.
+
 ## Architecture
 
 ```text
@@ -116,6 +134,8 @@ Next.js / React / TypeScript / shadcn-style UI
                      job_candidates
                           |
                   job_candidate_matches
+                          |
+                  outreach_requests
 ```
 
 ## State ownership
@@ -136,6 +156,7 @@ Next.js / React / TypeScript / shadcn-style UI
 - `job_candidates` owns the one stable Candidate↔Job relationship plus current recruiter shortlist state.
 - `job_candidate_matches` owns immutable historical evidence assessments tied to exact approved Job versions and evidence inputs.
 - Module 4 call readiness is derived from canonical Candidate phone truth and does not affect match score.
+- `outreach_requests` owns immutable recruiter-confirmed phone and question snapshots; readiness remains derived from current Module 1/2/4 truth.
 
 ## AI analysis
 
@@ -411,15 +432,24 @@ Module 1 still does not use Supabase Data API/Auth/Storage/Realtime, so it does 
 
 New tables have RLS enabled and browser roles revoked; the frontend accesses them only through FastAPI.
 
-## 8. Explicitly not implemented yet
+## Module 5 validation
+
+See `doc/MODULE_5_VALIDATION.md` for the complete automated, disposable-database, and manual UI
+qualification sequence. Run the dependency-free boundary gate with:
+
+```bash
+python scripts/validate_module_5.py
+```
+
+## Explicitly not implemented yet
 
 - Hunar Voice API calls
-- outreach lifecycle
+- Hunar outreach execution (Module 6)
 - screening/call-result recovery
 - screening answers dashboard
 - authentication / RBAC
 
-These belong to later modules and must consume the frozen Module 1–4 authorities rather than duplicating Job, Candidate, sourcing, match, or shortlist truth.
+These belong to later modules and must consume the frozen Module 1–5 authorities rather than duplicating Job, Candidate, sourcing, match, shortlist, or outreach truth.
 
 
 ## 7. Module 2 validation
