@@ -1,1 +1,1 @@
-# Module 6 placeholder. Hunar-specific code is intentionally absent from Module 0.
+"""Hunar read-only agent preflight and outbound call submission adapter."""

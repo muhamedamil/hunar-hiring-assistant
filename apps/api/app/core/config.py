@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
+from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, TypeAdapter, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.integrations.hunar.schemas import HunarLanguage, HunarTimezone
 
 
 class Settings(BaseSettings):
@@ -37,6 +42,55 @@ class Settings(BaseSettings):
     apollo_enrichment_read_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
     sourcing_search_stale_seconds: int = Field(default=300, ge=60, le=3600)
 
+    hunar_api_key: str | None = Field(default=None, repr=False)
+    hunar_api_base_url: str = "https://api.voice.hunar.ai/external/v1"
+    hunar_screening_agent_ids_json: str = "{}"
+    hunar_default_language: HunarLanguage = HunarLanguage.ENGLISH
+    hunar_default_timezone: HunarTimezone = HunarTimezone.ASIA_KOLKATA
+    hunar_read_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    hunar_call_summary_callback_url: str | None = None
+
+    @field_validator("hunar_screening_agent_ids_json")
+    @classmethod
+    def validate_hunar_bindings(cls, value: str) -> str:
+        """Validate explicit UUID bindings; only reviewed English is initially implemented."""
+        bindings = TypeAdapter(dict[HunarLanguage, UUID]).validate_json(value)
+        if set(bindings) - {HunarLanguage.ENGLISH}:
+            raise ValueError("Only the reviewed ENGLISH agent contract is implemented")
+        return value
+
+    @field_validator("hunar_default_language")
+    @classmethod
+    def validate_hunar_language(cls, value: HunarLanguage) -> HunarLanguage:
+        """Reject an unimplemented default language instead of silently translating."""
+        if value != HunarLanguage.ENGLISH:
+            raise ValueError("Only ENGLISH is implemented")
+        return value
+
+    @property
+    def hunar_agent_ids(self) -> dict[HunarLanguage, UUID]:
+        """Return validated configured immutable-language agent bindings."""
+        return {
+            HunarLanguage(k): UUID(v)
+            for k, v in json.loads(self.hunar_screening_agent_ids_json).items()
+        }
+
+    @field_validator("hunar_api_base_url", "hunar_call_summary_callback_url")
+    @classmethod
+    def validate_hunar_url(cls, value: str | None, info: ValidationInfo) -> str | None:
+        """Require HTTPS with a host and no embedded credentials for Hunar URLs."""
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            if info.field_name == "hunar_api_base_url":
+                raise ValueError("Hunar API base URL cannot be blank")
+            return None
+        parts = urlsplit(value)
+        if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+            raise ValueError("Hunar URLs must use HTTPS without credentials")
+        return value
+
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: str) -> str:
@@ -58,6 +112,8 @@ class Settings(BaseSettings):
         return normalized
 
     @field_validator(
+        "hunar_api_key",
+        "hunar_call_summary_callback_url",
         "gemini_api_key",
         "apollo_api_key",
         "apollo_webhook_base_url",
